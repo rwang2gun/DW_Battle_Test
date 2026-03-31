@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>속성 반응 시스템 프로토타입</title>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f1115; --panel: rgba(22,25,30,0.92); --border: rgba(255,255,255,0.07);
+            --text: #f3f4f6; --muted: #8c92a1; --dim: #4b5563;
+            --fire: #e11d48; --water: #2563eb; --thunder: #7c3aed;
+            --ice: #60a5fa; --light: #fcd34d; --dark: #6b7280;
+            --chaos: #9f1239; --physical: #9ca3af;
+        }
+        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+        body { background:var(--bg); color:var(--text); font-family:'Pretendard',sans-serif;
+            height:100vh; display:flex; flex-direction:column; overflow:hidden; user-select:none;
+            background-image:radial-gradient(ellipse at 20% 0%,rgba(40,45,55,.6) 0%,transparent 50%),
+                             radial-gradient(ellipse at 80% 100%,rgba(30,20,35,.5) 0%,transparent 50%); }
+
+        /* === TOP BAR === */
+        .top-bar { display:flex; align-items:center; justify-content:space-between;
+            padding:10px 24px; border-bottom:1px solid var(--border); background:var(--panel);
+            backdrop-filter:blur(12px); z-index:10; flex-shrink:0; height:52px; }
+        .top-bar h1 { font-size:1rem; font-weight:800; letter-spacing:1px; text-transform:uppercase; }
+        .top-bar h1 span { color:var(--fire); }
+        .char-slots { display:flex; gap:6px; }
+        .char-slot { width:36px; height:36px; border-radius:6px; border:2px solid var(--border);
+            display:flex; align-items:center; justify-content:center; font-size:.7rem; font-weight:800;
+            cursor:pointer; transition:all .15s; position:relative; opacity:.5; }
+        .char-slot:hover { opacity:.8; transform:translateY(-2px); }
+        .char-slot.active { opacity:1; border-color:currentColor; box-shadow:0 0 12px currentColor; }
+        .char-slot .key-hint { position:absolute; top:-6px; right:-4px; font-size:.55rem;
+            background:rgba(0,0,0,.7); padding:1px 3px; border-radius:3px; color:var(--muted); }
+        .top-btns { display:flex; gap:8px; }
+        .top-btns button { background:rgba(255,255,255,.05); border:1px solid var(--border);
+            color:var(--muted); padding:6px 14px; border-radius:6px; font-family:inherit;
+            font-size:.75rem; font-weight:600; cursor:pointer; transition:all .15s; }
+        .top-btns button:hover { background:rgba(255,255,255,.1); color:#fff; }
+
+        /* === MAIN LAYOUT === */
+        .main { display:flex; flex:1; overflow:hidden; }
+
+        /* LEFT: Combat Log */
+        .log-panel { width:260px; border-right:1px solid var(--border); background:var(--panel);
+            display:flex; flex-direction:column; flex-shrink:0; }
+        .log-header { padding:12px 16px; border-bottom:1px solid var(--border);
+            font-size:.75rem; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:var(--muted); }
+        .log-body { flex:1; overflow-y:auto; padding:8px 12px; display:flex; flex-direction:column; gap:3px; }
+        .log-body::-webkit-scrollbar { width:4px; }
+        .log-body::-webkit-scrollbar-thumb { background:rgba(255,255,255,.1); border-radius:2px; }
+        .log-entry { font-size:.72rem; padding:4px 8px; border-radius:4px; background:rgba(255,255,255,.02);
+            line-height:1.4; border-left:2px solid var(--dim); }
+        .log-entry .time { color:var(--dim); margin-right:6px; }
+        .log-entry.reaction { border-left-color:var(--fire); background:rgba(225,29,72,.05); }
+        .log-entry.damage { border-left-color:var(--muted); }
+        .log-entry.system { border-left-color:var(--water); background:rgba(37,99,235,.05); }
+
+        /* CENTER: Arena */
+        .arena { flex:1; display:flex; flex-direction:column; position:relative; overflow:hidden; }
+        .arena-bg { position:absolute; inset:0;
+            background:repeating-linear-gradient(45deg,transparent,transparent 20px,rgba(255,255,255,.008) 20px,rgba(255,255,255,.008) 40px); }
+        .arena-main { flex:1; display:flex; align-items:center; justify-content:center; position:relative; z-index:1; cursor:crosshair; }
+
+        /* Character Shapes */
+        .shape-container { position:relative; display:flex; flex-direction:column; align-items:center; }
+        .shape { transition:filter .2s, transform .2s; position:relative; }
+        .player-shape { width:80px; height:92px; clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+            display:flex; align-items:center; justify-content:center; font-size:1.8rem; font-weight:900; }
+        .enemy-shape { width:120px; height:120px; border-radius:12px; transform:rotate(45deg);
+            display:flex; align-items:center; justify-content:center; position:relative; }
+        .enemy-shape .inner { transform:rotate(-45deg); font-size:.9rem; font-weight:800; text-align:center; }
+        .enemy-hp-bar { width:140px; height:6px; background:rgba(255,255,255,.1); border-radius:3px; margin-top:12px; overflow:hidden; }
+        .enemy-hp-fill { height:100%; background:linear-gradient(90deg,#ef4444,#f97316); border-radius:3px; transition:width .3s; }
+        .enemy-hp-text { font-size:.65rem; color:var(--muted); margin-top:4px; text-align:center; }
+
+        /* Status Tray on Enemy */
+        .status-tray { position:absolute; top:-40px; left:50%; transform:translateX(-50%);
+            display:flex; gap:4px; padding:4px 8px; background:rgba(0,0,0,.6); border-radius:12px;
+            min-width:40px; justify-content:center; z-index:20; }
+        .status-badge { width:28px; height:28px; border-radius:50%; display:flex; align-items:center;
+            justify-content:center; font-size:.55rem; font-weight:900; color:#fff;
+            box-shadow:0 0 8px currentColor; animation:popIn .3s cubic-bezier(.2,.8,.2,1); }
+        .gauge-bar { position:absolute; bottom:-2px; left:2px; right:2px; height:3px;
+            border-radius:1px; background:rgba(0,0,0,.5); overflow:hidden; }
+        .gauge-fill { height:100%; border-radius:1px; transition:width .1s linear; }
+        .gauge-val { position:absolute; left:-18px; top:-2px; font-size:.45rem; font-weight:800;
+            color:rgba(255,255,255,.85); text-shadow:0 1px 2px rgba(0,0,0,.9); white-space:nowrap; }
+
+        /* Damage Popups */
+        .dmg-popup { position:absolute; font-weight:900; white-space:nowrap; pointer-events:none;
+            text-shadow:0 2px 8px rgba(0,0,0,.8),1px 1px 0 #000; z-index:50;
+            animation:floatUp 1s cubic-bezier(.2,.8,.2,1) forwards; }
+        .dmg-popup.big { font-size:2rem; }
+        .dmg-popup.normal { font-size:1.3rem; }
+        .dmg-popup.info { font-size:.85rem; }
+
+        /* Zone Overlay */
+        .zone-overlay { position:absolute; border-radius:50%; opacity:0; pointer-events:none;
+            animation:zoneAppear .5s forwards; z-index:5; }
+        .zone-timer { position:absolute; top:-20px; left:50%; transform:translateX(-50%);
+            font-size:.65rem; font-weight:800; color:#fff; text-shadow:0 1px 4px rgba(0,0,0,.8); }
+
+        /* Versus divider */
+        .vs-divider { font-size:1.5rem; font-weight:900; color:var(--dim); margin:0 60px; letter-spacing:4px; }
+
+        /* RIGHT: Reaction Matrix */
+        .matrix-panel { width:280px; border-left:1px solid var(--border); background:var(--panel);
+            display:flex; flex-direction:column; flex-shrink:0; overflow-y:auto; }
+        .matrix-header { padding:12px 16px; border-bottom:1px solid var(--border);
+            font-size:.75rem; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:var(--muted); }
+        .matrix-body { padding:12px; display:flex; flex-direction:column; gap:6px; flex:1; overflow-y:auto; }
+        .matrix-body::-webkit-scrollbar { width:4px; }
+        .matrix-body::-webkit-scrollbar-thumb { background:rgba(255,255,255,.1); border-radius:2px; }
+        .rx-card { padding:8px 10px; border-radius:6px; background:rgba(255,255,255,.02);
+            border:1px solid transparent; transition:all .2s; }
+        .rx-card.possible { border-color:rgba(255,255,255,.15); background:rgba(255,255,255,.05); }
+        .rx-card.active { border-color:var(--fire); background:rgba(225,29,72,.08); animation:pulseGlow .6s; }
+        .rx-card .rx-name { font-size:.8rem; font-weight:800; }
+        .rx-card .rx-formula { font-size:.65rem; color:var(--muted); margin-top:2px; }
+        .rx-card .rx-effect { font-size:.65rem; color:var(--dim); margin-top:2px; }
+        .rx-card .rx-priority { font-size:.55rem; font-weight:800; padding:1px 5px; border-radius:3px;
+            background:rgba(255,255,255,.08); color:var(--muted); float:right; }
+
+        /* === BOTTOM HUD === */
+        .hud { display:flex; align-items:center; justify-content:center; gap:32px;
+            padding:12px 24px; border-top:1px solid var(--border); background:var(--panel);
+            backdrop-filter:blur(12px); flex-shrink:0; height:72px; }
+        .hud-controls { display:flex; gap:12px; align-items:center; }
+        .hud-key { display:flex; flex-direction:column; align-items:center; gap:2px; }
+        .hud-key .key { width:36px; height:28px; border-radius:4px; border:1px solid var(--border);
+            display:flex; align-items:center; justify-content:center; font-size:.65rem; font-weight:800;
+            background:rgba(255,255,255,.04); }
+        .hud-key .key.disabled { opacity:.3; }
+        .hud-key .label { font-size:.5rem; color:var(--dim); text-transform:uppercase; }
+        .hud-divider { width:1px; height:40px; background:var(--border); }
+        .resource-bar { display:flex; flex-direction:column; gap:4px; width:180px; }
+        .resource-row { display:flex; align-items:center; gap:8px; }
+        .resource-label { font-size:.65rem; font-weight:800; width:24px; }
+        .resource-track { flex:1; height:8px; background:rgba(255,255,255,.08); border-radius:4px; overflow:hidden; }
+        .resource-fill { height:100%; border-radius:4px; transition:width .2s; }
+        .resource-fill.sp { background:linear-gradient(90deg,#10b981,#34d399); }
+        .resource-fill.up { background:linear-gradient(90deg,#f59e0b,#fbbf24); }
+        .resource-val { font-size:.6rem; color:var(--muted); width:36px; text-align:right; }
+        .combo-display { display:flex; flex-direction:column; align-items:center; }
+        .combo-num { font-size:1.8rem; font-weight:900; line-height:1; }
+        .combo-label { font-size:.5rem; color:var(--dim); text-transform:uppercase; letter-spacing:1px; }
+        .charge-indicator { width:60px; height:4px; background:rgba(255,255,255,.08); border-radius:2px; overflow:hidden; margin-top:4px; }
+        .charge-fill { height:100%; width:0%; background:linear-gradient(90deg,var(--fire),#f97316); border-radius:2px; transition:width .05s linear; }
+
+        /* === ANIMATIONS === */
+        @keyframes popIn { 0%{transform:scale(0)} 70%{transform:scale(1.3)} 100%{transform:scale(1)} }
+        @keyframes floatUp {
+            0%{transform:translate(-50%,0) scale(.5);opacity:0}
+            15%{transform:translate(-50%,-15px) scale(1.2);opacity:1}
+            70%{transform:translate(-50%,-35px) scale(1);opacity:1}
+            100%{transform:translate(-50%,-55px) scale(.8);opacity:0} }
+        @keyframes pulseGlow { 0%,100%{box-shadow:none} 50%{box-shadow:0 0 12px rgba(225,29,72,.3)} }
+        @keyframes zoneAppear { 0%{opacity:0;transform:scale(.3)} 100%{opacity:.25;transform:scale(1)} }
+        @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+        @keyframes attackLunge { 0%{transform:translateX(0) scale(1)} 20%{transform:translateX(60px) scale(1.15)} 40%{transform:translateX(60px) scale(1.15)} 100%{transform:translateX(0) scale(1)} }
+        @keyframes enemyHit { 0%{filter:brightness(1)} 20%{filter:brightness(1.8)} 100%{filter:brightness(1)} }
+        @keyframes frozen { 0%,100%{outline-offset:0} 50%{outline-offset:4px} }
+        .particle { position:absolute; border-radius:50%; pointer-events:none; z-index:40; mix-blend-mode:screen; }
+    </style>
+</head>
+<body>
+    <div id="setupScreen" style="position:fixed; inset:0; z-index:9999; background:rgba(15,17,21,0.95); backdrop-filter:blur(10px); display:flex; flex-direction:column; align-items:center; justify-content:center;">
+        <h2 style="font-size:2rem; margin-bottom:40px; color:#f8fafc; text-shadow:0 2px 10px rgba(0,0,0,0.8);">🛡️ 파티 편성 (3인)</h2>
+        <div style="display:flex; gap:20px; margin-bottom:50px;">
+            <div style="display:flex; flex-direction:column; align-items:center; gap:10px; padding:20px; background:rgba(255,255,255,0.05); border-radius:12px; border:1px solid rgba(255,255,255,0.1); width:140px;">
+                <div style="font-weight:800; color:#8c92a1; font-size:0.85rem;">Slot 1</div>
+                <select id="slot1" style="width:100%; padding:8px; border-radius:6px; background:#1e293b; color:#fff; border:1px solid #475569; outline:none; font-weight:600; cursor:pointer;">
+                    <option value="fire">🔥 화염</option><option value="water">💧 물</option><option value="thunder">⚡ 번개</option><option value="ice">❄️ 얼음</option><option value="light">☀️ 빛</option><option value="dark">🌑 어둠</option>
+                </select>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:10px; padding:20px; background:rgba(255,255,255,0.05); border-radius:12px; border:1px solid rgba(255,255,255,0.1); width:140px;">
+                <div style="font-weight:800; color:#8c92a1; font-size:0.85rem;">Slot 2</div>
+                <select id="slot2" style="width:100%; padding:8px; border-radius:6px; background:#1e293b; color:#fff; border:1px solid #475569; outline:none; font-weight:600; cursor:pointer;">
+                    <option value="fire">🔥 화염</option><option value="water" selected>💧 물</option><option value="thunder">⚡ 번개</option><option value="ice">❄️ 얼음</option><option value="light">☀️ 빛</option><option value="dark">🌑 어둠</option>
+                </select>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:10px; padding:20px; background:rgba(255,255,255,0.05); border-radius:12px; border:1px solid rgba(255,255,255,0.1); width:140px;">
+                <div style="font-weight:800; color:#8c92a1; font-size:0.85rem;">Slot 3</div>
+                <select id="slot3" style="width:100%; padding:8px; border-radius:6px; background:#1e293b; color:#fff; border:1px solid #475569; outline:none; font-weight:600; cursor:pointer;">
+                    <option value="fire">🔥 화염</option><option value="water">💧 물</option><option value="thunder" selected>⚡ 번개</option><option value="ice">❄️ 얼음</option><option value="light">☀️ 빛</option><option value="dark">🌑 어둠</option>
+                </select>
+            </div>
+        </div>
+        <button onclick="startGame()" style="padding:15px 40px; font-size:1.2rem; font-weight:800; border-radius:8px; background:linear-gradient(90deg, #3b82f6, #2563eb); color:#fff; border:none; cursor:pointer; box-shadow:0 4px 15px rgba(37,99,235,0.4);">전투 시작</button>
+    </div>
+    
+    <div id="appContainer" style="display:none; flex-direction:column; height:100vh;">
+    <!-- TOP BAR -->
+    <div class="top-bar">
+        <h1><span>◆</span> 속성 반응 시스템 <span>PROTOTYPE</span></h1>
+        <div class="char-slots" id="charSlots"></div>
+        <div class="top-btns">
+            <button onclick="resetAll()">↻ 리셋</button>
+        </div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="main">
+        <!-- LEFT: Log -->
+        <div class="log-panel">
+            <div class="log-header">◇ Combat Log</div>
+            <div class="log-body" id="logBody"></div>
+        </div>
+
+        <!-- CENTER: Arena -->
+        <div class="arena" id="arena" style="position:relative;">
+            <div style="display:flex; justify-content:center;">
+                <div id="attachStats" style="position:absolute; top:15px; left:50%; transform:translateX(-50%); z-index:50; font-size:0.75rem; color:#94a3b8; background:rgba(0,0,0,0.85); padding:6px 16px; border-radius:6px; border:1px solid #475569; opacity:0; transition:opacity 0.2s; display:flex; align-items:center; gap:16px; box-shadow:0 4px 12px rgba(0,0,0,0.5);">
+                    <div style="text-align:right; border-right:1px solid #475569; padding-right:16px;">
+                        <div style="font-size:0.65rem; color:#cbd5e1; margin-bottom:2px;">적 처치 전 최고기록</div>
+                        <div>단일 <span id="hiSingleDmg" style="color:#f87171;font-weight:bold;">0</span> &nbsp;|&nbsp; 구간누적 <span id="hiAttachDmg" style="color:#facc15;font-weight:bold;">0</span></div>
+                    </div>
+                    <div>
+                        [<span id="statElName" style="font-weight:bold; color:#fff;">대기 중</span>] 부착 통계 ─ 
+                        누적: <span id="attachDmg" style="color:#fbbf24;font-weight:bold;font-size:0.8rem;">0</span> &nbsp;|&nbsp; 
+                        DPS: <span id="attachDps" style="color:#38bdf8;font-weight:bold;font-size:0.8rem;">0</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arena-bg"></div>
+            <div class="arena-main" id="arenaMain">
+                <div class="shape-container" id="playerContainer">
+                    <div id="playerGuides" style="position:absolute; bottom: 100%; margin-bottom: 5px; width:100%; display:flex; flex-direction:column; align-items:center; gap:4px; pointer-events:none; z-index:10;">
+                        <div id="guideQ" style="background:#fbbf24; color:#111; font-weight:800; font-size:0.75rem; padding:4px 8px; border-radius:4px; box-shadow:0 0 12px #fbbf24; display:none; align-items:center; opacity:0.9;">Q 궁극기</div>
+                        <div id="guideE" style="background:#10b981; color:#fff; font-weight:bold; font-size:0.75rem; padding:4px 8px; border-radius:4px; box-shadow:0 0 8px #10b981; display:none; align-items:center; opacity:0.9;">E 사용</div>
+                    </div>
+                    <div class="player-shape shape" id="playerShape"></div>
+                    <div style="margin-top:8px;text-align:center;">
+                        <div id="playerName" style="font-size:.75rem;font-weight:800;"></div>
+                        <div id="playerElement" style="font-size:.6rem;color:var(--muted);"></div>
+                    </div>
+                </div>
+                <div class="vs-divider">VS</div>
+                <div class="shape-container" id="enemyContainer">
+                    <div class="status-tray" id="statusTray"></div>
+                    <div class="enemy-shape shape" id="enemyShape">
+                        <div class="inner" id="enemyInner">ENEMY</div>
+                    </div>
+                    <div class="enemy-hp-bar"><div class="enemy-hp-fill" id="enemyHpFill" style="width:100%"></div></div>
+                    <div class="enemy-hp-text" id="enemyHpText">1000 / 1000</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Reaction Matrix -->
+        <div class="matrix-panel">
+            <div class="matrix-header">◇ Reaction Matrix</div>
+            <div class="matrix-body" id="matrixBody"></div>
+        </div>
+    </div>
+
+    <!-- BOTTOM HUD -->
+    <div class="hud">
+        <div class="combo-display">
+            <div class="combo-num" id="comboNum" style="color:var(--physical)">0</div>
+            <div class="combo-label">Combo</div>
+            <div class="charge-indicator"><div class="charge-fill" id="chargeFill"></div></div>
+        </div>
+        <div class="hud-divider"></div>
+        <div class="hud-controls">
+            <div class="hud-key"><div class="key" id="keyLmb">LMB</div><div class="label">공격</div></div>
+            <div class="hud-key"><div class="key" id="keyHold">Hold</div><div class="label">강공격</div></div>
+            <div class="hud-key"><div class="key" id="keyE">E</div><div class="label">스킬</div></div>
+            <div class="hud-key"><div class="key" id="keyQ">Q</div><div class="label">궁극기</div></div>
+        </div>
+        <div class="hud-divider"></div>
+        <div class="resource-bar">
+            <div class="resource-row">
+                <div class="resource-label" style="color:#34d399">SP</div>
+                <div class="resource-track"><div class="resource-fill sp" id="spFill" style="width:0%"></div></div>
+                <div class="resource-val" id="spVal">0 / 50</div>
+            </div>
+            <div class="resource-row">
+                <div class="resource-label" style="color:#fbbf24">UP</div>
+                <div class="resource-track"><div class="resource-fill up" id="upFill" style="width:0%"></div></div>
+                <div class="resource-val" id="upVal">0 / 50</div>
+            </div>
+        </div>
+        <div class="hud-divider"></div>
+        <div class="hud-controls">
+            <div class="hud-key"><div class="key">1-6</div><div class="label">교체</div></div>
+        </div>
+    </div>
+    <script>
+    // ======== CONFIG ========
+    const CFG = {
+        DMG: { combo: [100, 120, 180], charged: 250, skill: 350, ultBurst: 800, ultZoneTick: 100 },
+        SP_MAX: 50, UP_MAX: 50,
+        SP_GAIN: { combo: [3, 3, 4], charged: 10 },
+        SKILL_COST: 25, SKILL_UP_GAIN: 20, ULT_COST: 50,
+        ENEMY_HP: 500000, ENEMY_DEF: 100,
+        GAUGE: { charged: 25, skill: 50, ult: 100, max: 100 },
+        COMBO_WINDOW: 800, CHARGE_TIME: 250,
+        ATTACH_DURATION: 10,
+        POST_DELAY: { combo: 300, charged: 300, skill: 800, ult: 1200 },
+    };
+
+    const ELEMENTS = {
+        fire:    { name:'화', color:'#e11d48', key:'1', icon:'🔥' },
+        water:   { name:'수', color:'#2563eb', key:'2', icon:'💧' },
+        thunder: { name:'뇌', color:'#7c3aed', key:'3', icon:'⚡' },
+        ice:     { name:'빙', color:'#60a5fa', key:'4', icon:'❄️' },
+        light:   { name:'명', color:'#fcd34d', key:'5', icon:'✦' },
+        dark:    { name:'암', color:'#6b7280', key:'6', icon:'◆' },
+    };
+    const EL_KEYS = Object.keys(ELEMENTS);
+
+    const REACTIONS = [
+        { id:'vaporize',  a:'fire',b:'water',   name:'기화',  nameEn:'Vaporize',   prio:5, mult:1.5, type:'instant', effect:'150% 증폭',       color:'#f97316' },
+        { id:'melt',      a:'fire',b:'ice',     name:'융해',  nameEn:'Melt',       prio:5, mult:1.1, type:'instant', effect:'10% 증가',        color:'#fbbf24' },
+        { id:'overheat',  a:'fire',b:'thunder', name:'과열',  nameEn:'Overheat',   prio:5, mult:2.0, type:'explosion',effect:'화속성 폭발',    color:'#dc2626' },
+        { id:'freeze',    a:'water',b:'ice',    name:'빙결',  nameEn:'Freeze',     prio:1, mult:0,   type:'cc',      effect:'3초 행동불가 +20%',color:'#38bdf8' },
+        { id:'electrify', a:'water',b:'thunder',name:'감전',  nameEn:'Electrify',  prio:5, mult:0.5, type:'dot',     effect:'4초 DoT',         color:'#8b5cf6' },
+        { id:'embrittle', a:'thunder',b:'ice',  name:'파열',  nameEn:'Embrittle',  prio:5, mult:1.5, type:'defbreak',effect:'방어무시 150%',   color:'#6366f1' },
+        { id:'corrosion', a:'_elem4',b:'dark',  name:'침식',  nameEn:'Corrosion',  prio:5, mult:2.5, type:'instant', effect:'대량 암속성',     color:'#374151' },
+        { id:'gloss',     a:'_elem4',b:'light', name:'광채',  nameEn:'Gloss',      prio:4, mult:0,   type:'buff',    effect:'Gauge 2배',       color:'#fef08a' },
+        { id:'chaos',     a:'light',b:'dark',   name:'혼돈',  nameEn:'Chaos',      prio:3, mult:0,   type:'transform',effect:'8초 혼돈 치환',  color:'#9f1239' },
+        { id:'annihilation',a:'_chaos',b:'_elem4',name:'붕괴',nameEn:'Annihilation',prio:2,mult:3.0, type:'truedmg', effect:'방어/면역 무시',  color:'#f43f5e' },
+    ];
+    const ELEM4 = ['fire','water','thunder','ice'];
+
+    // ======== STATE ========
+    const state = {
+        activeChar: 0,
+        characters: [],
+        enemy: { hp: CFG.ENEMY_HP, maxHp: CFG.ENEMY_HP, def: CFG.ENEMY_DEF,
+                 stacks: [], attached: null,
+                 frozen: false, frozenTimer: null, defDown: false, defDownTimer: null,
+                 chaos: false, chaosTimer: null, dotTimers: [],
+                 maxSingleDmg: 0, maxAttachDmg: 0 },
+        lastAttach: null,
+        combo: 0, comboTimer: null,
+        lockedBy: null, lockTimer: null,
+        mouseDownTime: 0, isCharging: false, chargeInterval: null,
+        logCount: 0,
+    };
+
+    // ======== HELPERS ========
+    function setLock(ms, type) {
+        state.lockedBy = type;
+        document.getElementById('playerShape').style.opacity = '0.4';
+        clearTimeout(state.lockTimer);
+        updateUI();
+        state.lockTimer = setTimeout(() => {
+            state.lockedBy = null;
+            document.getElementById('playerShape').style.opacity = '1';
+            updateUI();
+        }, ms);
+    }
+    function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+    function curChar() { return state.characters[state.activeChar]; }
+    function curElement() { return curChar().element; }
+    function gainEnergy(spGain, upGain) {
+        state.characters.forEach((c, i) => {
+            const mult = (i === state.activeChar) ? 1 : 0.1;
+            c.sp = clamp(c.sp + Math.round(spGain * mult), 0, CFG.SP_MAX);
+            c.up = clamp(c.up + Math.round(upGain * mult), 0, CFG.UP_MAX);
+        });
+    }
+    function elColor(el) { return ELEMENTS[el]?.color || '#fff'; }
+    function elName(el) { return ELEMENTS[el]?.name || el; }
+
+    function calcDamage(raw) {
+        let def = state.enemy.defDown ? 0 : state.enemy.def;
+        return Math.max(1, Math.round(raw * raw / (raw + def)));
+    }
+    function calcDamageTrueDmg(raw) { return Math.round(raw); }
+
+    // ======== REACTION ENGINE ========
+    function findReaction(hostEl, triggerEl) {
+        let matches = [];
+        for (const rx of REACTIONS) {
+            let match = false;
+            if (rx.a === '_elem4' && rx.b === '_elem4') continue;
+            if (rx.id === 'annihilation') {
+                if (hostEl === 'chaos' && ELEM4.includes(triggerEl)) match = true;
+            } else if (rx.a === '_elem4') {
+                if (ELEM4.includes(hostEl) && triggerEl === rx.b) match = true;
+            } else if (rx.b === '_elem4') {
+                if (hostEl === rx.a && ELEM4.includes(triggerEl)) match = true;
+            } else if (rx.a === '_chaos') {
+                if (hostEl === 'chaos' && ELEM4.includes(triggerEl)) match = true;
+            } else {
+                if ((hostEl === rx.a && triggerEl === rx.b) || (hostEl === rx.b && triggerEl === rx.a)) match = true;
+            }
+            if (match) matches.push(rx);
+        }
+        matches.sort((a, b) => a.prio - b.prio);
+        return matches[0] || null;
+    }
+
+    function resolveReactions(triggerEl, triggerDamage, gaugeAmount) {
+        if (!gaugeAmount) return;
+        const enemy = state.enemy;
+
+        // === 부착 상태 (10초 유지) ===
+        if (enemy.attached) {
+            if (enemy.attached.element === triggerEl) {
+                // 동일 원소: 게이지 누적 불가 및 면역 메시지
+                showPopup('면역', '#888', 'info', 'right');
+            } else {
+                // 타 원소: 즉발 반응 (게이지 무관)
+                let rx = null;
+                if (enemy.chaos) {
+                    rx = findReaction('chaos', triggerEl);
+                }
+                if (!rx) {
+                    rx = findReaction(enemy.attached.element, triggerEl);
+                }
+                
+                if (rx) {
+                    executeReaction(rx, triggerDamage);
+                } else {
+                    addLog('반응 없음 (유효한 조합 아님)', 'system');
+                    showPopup('반응 없음', '#888', 'info', 'right');
+                }
+            }
+            updateUI();
+            return; // 10초 부착 중에는 어떠한 게이지 누적도 없음 (전면 중단)
+        }
+
+        // === 미부착 상태 (게이지 활성화 및 누적 경쟁) ===
+        let targetStack = enemy.stacks.find(s => s.element === triggerEl);
+        if (!targetStack) {
+            targetStack = { element: triggerEl, gauge: 0 };
+            enemy.stacks.push(targetStack);
+        }
+
+        targetStack.gauge = clamp(targetStack.gauge + gaugeAmount, 0, CFG.GAUGE.max);
+
+        if (targetStack.gauge >= CFG.GAUGE.max) {
+            // 가장 먼저 MAX(100) 도달 시 확정 부착 진입
+            targetStack.gauge = 0; 
+            addLog(`${elName(triggerEl)} 부착! (타 원소 누적 정지)`, 'system');
+            attachElement(triggerEl);
+        } else {
+            showPopup(`${elName(triggerEl)} ${targetStack.gauge}%`, elColor(triggerEl), 'info', 'right');
+            addLog(`${elName(triggerEl)} 게이지 누적: ${targetStack.gauge}%`, 'damage');
+        }
+        updateUI();
+    }
+
+    function attachElement(el) {
+        if (state.enemy.attached) clearInterval(state.enemy.attached.intervalId);
+        
+        state.lastAttach = { element: el, totalDmg: 0, dps: 0, startTime: Date.now(), active: true };
+        
+        state.enemy.attached = { element: el, remaining: CFG.ATTACH_DURATION, totalDmg: 0, startTime: Date.now() };
+        state.enemy.stacks = []; // 다른 모든 미부착 속성 게이지 초기화
+        
+        state.enemy.attached.intervalId = setInterval(() => {
+            if (!state.enemy.attached) return;
+            state.enemy.attached.remaining--;
+            if (state.enemy.attached.remaining <= 0) {
+                clearInterval(state.enemy.attached.intervalId);
+                state.enemy.attached = null;
+                if (state.lastAttach) state.lastAttach.active = false;
+                addLog(`${elName(el)} 부착 종료`, 'system');
+            }
+            updateUI();
+        }, 1000);
+        showPopup(`🎯 ${elName(el)} 부착!`, elColor(el), 'big');
+    }
+
+    function executeReaction(rx, triggerDamage) {
+        const enemy = state.enemy;
+        addLog(`⚡ ${rx.name} (${rx.nameEn}) 발동!`, 'reaction');
+        flashMatrixCard(rx.id);
+        switch (rx.type) {
+            case 'instant': {
+                const dmg = calcDamage(triggerDamage * rx.mult);
+                applyDamage(dmg);
+                showPopup(`${rx.name}! ${dmg}`, rx.color, 'big', 'right');
+                shakeEnemy();
+                break;
+            }
+            case 'explosion': {
+                const baseDmg = triggerDamage > 0 ? triggerDamage : CFG.DMG.skill;
+                const dmg = calcDamage(baseDmg * rx.mult);
+                applyDamage(dmg);
+                showPopup(`${rx.name}! ${dmg}`, rx.color, 'big', 'right');
+                shakeEnemy(); shakeScreen();
+                break;
+            }
+            case 'cc': {
+                enemy.frozen = true;
+                showPopup('❄️ 빙결! 3초', rx.color, 'big', 'right');
+                clearTimeout(enemy.frozenTimer);
+                enemy.frozenTimer = setTimeout(() => { enemy.frozen = false; addLog('빙결 해제', 'system'); updateUI(); }, 3000);
+                break;
+            }
+            case 'dot': {
+                showPopup(`${rx.name}! DoT 4틱`, rx.color, 'big', 'right');
+                let ticks = 0;
+                const dotId = setInterval(() => {
+                    if (++ticks > 4) { clearInterval(dotId); return; }
+                    const dmg = calcDamage(CFG.DMG.combo[0] * rx.mult);
+                    applyDamage(dmg);
+                    showPopup(`감전 ${dmg}`, rx.color, 'normal', 'right');
+                    addLog(`감전 ${ticks}틱: ${dmg} 피해`, 'damage');
+                    updateUI();
+                }, 1000);
+                break;
+            }
+            case 'defbreak': {
+                const dmg = calcDamageTrueDmg(triggerDamage * rx.mult);
+                applyDamage(dmg);
+                showPopup(`${rx.name}! ${dmg}`, rx.color, 'big', 'right');
+                enemy.defDown = true;
+                clearTimeout(enemy.defDownTimer);
+                enemy.defDownTimer = setTimeout(() => { enemy.defDown = false; addLog('방어 감소 해제', 'system'); updateUI(); }, 3000);
+                shakeEnemy();
+                break;
+            }
+            case 'buff': {
+                if (state.enemy.attached) state.enemy.attached.remaining += 10;
+                showPopup(`${rx.name}! +10s`, rx.color, 'big', 'right');
+                addLog(`광채: 유지시간 10초 증가`, 'reaction');
+                break;
+            }
+            case 'transform': {
+                enemy.chaos = true;
+                showPopup('🌀 혼돈! 8초', rx.color, 'big', 'right');
+                shakeEnemy();
+                clearTimeout(enemy.chaosTimer);
+                enemy.chaosTimer = setTimeout(() => { enemy.chaos = false; addLog('혼돈 상태 해제', 'system'); updateUI(); }, 8000);
+                break;
+            }
+            case 'truedmg': {
+                const baseDmg = triggerDamage > 0 ? triggerDamage : CFG.DMG.skill;
+                const dmg = calcDamageTrueDmg(baseDmg * rx.mult);
+                applyDamage(dmg);
+                showPopup(`💥 ${rx.name}! ${dmg}`, rx.color, 'big', 'right');
+                addLog(`붕괴! ${dmg} TRUE DAMAGE (방어/면역 무시)`, 'reaction');
+                enemy.chaos = false; clearTimeout(enemy.chaosTimer);
+                shakeEnemy(); shakeScreen();
+                break;
+            }
+        }
+        updateUI();
+    }
+
+    function applyDamage(dmg) {
+        state.enemy.hp = clamp(state.enemy.hp - dmg, 0, state.enemy.maxHp);
+        
+        if (dmg > state.enemy.maxSingleDmg) state.enemy.maxSingleDmg = dmg;
+
+        if (state.enemy.attached) state.enemy.attached.totalDmg += dmg;
+        if (state.lastAttach && state.lastAttach.active) {
+            state.lastAttach.totalDmg += dmg;
+            if (state.lastAttach.totalDmg > state.enemy.maxAttachDmg) {
+                state.enemy.maxAttachDmg = state.lastAttach.totalDmg;
+            }
+        }
+        if (state.enemy.hp <= 0) {
+            addLog('적 처치! 최고기록이 리셋되며 자동 부활합니다.', 'system');
+            setTimeout(() => { 
+                state.enemy.hp = state.enemy.maxHp; 
+                state.enemy.stacks = [];
+                if (state.enemy.attached) clearInterval(state.enemy.attached.intervalId);
+                state.enemy.attached = null;
+                if (state.lastAttach) state.lastAttach.active = false;
+                state.enemy.frozen = false; state.enemy.chaos = false; 
+                state.enemy.maxSingleDmg = 0;
+                state.enemy.maxAttachDmg = 0;
+                updateUI(); 
+            }, 1500);
+        }
+    }
+
+    // ======== COMBAT ACTIONS ========
+    function doComboAttack() {
+        setLock(CFG.POST_DELAY.combo, 'combo');
+        const c = state.combo;
+        const rawDmg = calcDamage(CFG.DMG.combo[c]);
+        const frozen = state.enemy.frozen;
+        const dmg = frozen ? Math.round(rawDmg * 1.2) : rawDmg;
+        const spGain = CFG.SP_GAIN.combo[c];
+        applyDamage(dmg);
+        gainEnergy(spGain, 0);
+        showPopup(`${dmg}`, frozen ? '#38bdf8' : '#ccc', 'normal');
+        addLog(`콤보 ${c + 1}타: ${dmg} 물리 피해 (SP +${spGain})${frozen ? ' [쇄빙+20%]' : ''}`, 'damage');
+        animateAttack(CFG.POST_DELAY.combo, 'physical', 'combo');
+        if (frozen) applyShatter();
+        state.combo = (c + 1) % 3;
+        clearTimeout(state.comboTimer);
+        state.comboTimer = setTimeout(() => { state.combo = 0; updateUI(); }, CFG.COMBO_WINDOW);
+        updateUI();
+    }
+
+    function doChargedAttack() {
+        setLock(CFG.POST_DELAY.charged, 'charged');
+        const el = curElement();
+        const dmg = calcDamage(CFG.DMG.charged);
+        const frozen = state.enemy.frozen;
+        const finalDmg = frozen ? Math.round(dmg * 1.2) : dmg;
+        applyDamage(finalDmg);
+        gainEnergy(CFG.SP_GAIN.charged, 0);
+        showPopup(`${finalDmg}`, elColor(el), 'normal');
+        addLog(`강공격: ${finalDmg} ${elName(el)} 피해 (SP +${CFG.SP_GAIN.charged})${frozen ? ' [쇄빙+20%]' : ''}`, 'damage');
+        animateAttack(CFG.POST_DELAY.charged, el, 'charged');
+        if (frozen) applyShatter();
+        resolveReactions(el, CFG.DMG.charged, CFG.GAUGE.charged);
+        state.combo = 0;
+        updateUI();
+    }
+
+    function doSkill() {
+        const ch = curChar();
+        if (ch.sp < CFG.SKILL_COST) return;
+        setLock(CFG.POST_DELAY.skill, 'skill');
+        ch.sp -= CFG.SKILL_COST;
+        gainEnergy(0, CFG.SKILL_UP_GAIN);
+        const el = curElement();
+        const frozen = state.enemy.frozen;
+        const dmg = calcDamage(CFG.DMG.skill);
+        const finalDmg = frozen ? Math.round(dmg * 1.2) : dmg;
+        applyDamage(finalDmg);
+        showPopup(`스킬 ${finalDmg}`, elColor(el), 'big');
+        addLog(`속성 스킬: ${finalDmg} ${elName(el)} 피해 (SP -${CFG.SKILL_COST}, UP +${CFG.SKILL_UP_GAIN})`, 'damage');
+        animateAttack(CFG.POST_DELAY.skill, el, 'skill');
+        if (frozen) applyShatter();
+        resolveReactions(el, CFG.DMG.skill, CFG.GAUGE.skill);
+        state.combo = 0;
+        updateUI();
+    }
+
+    function doUltimate() {
+        const ch = curChar();
+        if (ch.up < CFG.ULT_COST) return;
+        setLock(CFG.POST_DELAY.ult, 'ult');
+        ch.up -= CFG.ULT_COST;
+        const el = curElement();
+        const frozen = state.enemy.frozen;
+        const dmg = calcDamage(CFG.DMG.ultBurst);
+        const finalDmg = frozen ? Math.round(dmg * 1.2) : dmg;
+        applyDamage(finalDmg);
+        showPopup(`궁극기 ${finalDmg}`, elColor(el), 'big');
+        addLog(`궁극기: ${finalDmg} ${elName(el)} 피해 (UP -${CFG.ULT_COST})`, 'damage');
+        if (frozen) applyShatter();
+        resolveReactions(el, CFG.DMG.ultBurst, CFG.GAUGE.ult);
+        animateAttack(CFG.POST_DELAY.ult, el, 'ult');
+        state.combo = 0;
+        updateUI();
+    }
+
+
+
+    // ======== UI & VISUALS ========
+    function showPopup(text, color, size, position) {
+        const el = document.createElement('div');
+        el.className = `dmg-popup ${size}`;
+        el.textContent = text;
+        el.style.color = color;
+        if (position === 'right') {
+            el.style.left = '110%';
+            el.style.textAlign = 'left';
+        } else {
+            el.style.left = '50%';
+        }
+        el.style.top = `${25 + Math.random() * 25}%`;
+        document.getElementById('enemyContainer').appendChild(el);
+        setTimeout(() => el.remove(), 1200);
+    }
+
+    function applyShatter() {
+        if (state.enemy.frozen) {
+            state.enemy.frozen = false;
+            clearTimeout(state.enemy.frozenTimer);
+            showPopup('💎 쇄빙!', '#38bdf8', 'big', 'right');
+            addLog('쇄빙! 빙결 해제 (+20% 피해 적용됨)', 'reaction');
+            updateUI();
+        }
+    }
+
+    function animateAttack(ms, element, type) {
+        const p = document.getElementById('playerContainer');
+        p.style.animation = 'none'; void p.offsetWidth;
+        p.style.animation = `attackLunge ${ms}ms cubic-bezier(.2,.8,.2,1)`;
+        setTimeout(() => {
+            const e = document.getElementById('enemyShape');
+            e.style.animation = 'none'; void e.offsetWidth;
+            e.style.animation = 'enemyHit .3s';
+        }, 100);
+        spawnParticles(element, type, ms);
+    }
+    
+    function spawnParticles(element, type, ms) {
+        let color = elColor(element);
+        if (element === 'physical') color = '#cbd5e1';
+        
+        const container = document.getElementById('arenaMain');
+        const enemyObj = document.getElementById('enemyShape');
+        
+        // 파티클 기본 설정
+        let count = 8, spread = 60, size = 8;
+        if (type === 'ult') { count = 35; spread = 200; size = 25; shakeScreen(); }
+        else if (type === 'skill') { count = 20; spread = 120; size = 15; }
+        else if (type === 'charged') { count = 15; spread = 90; size = 12; }
+        
+        const eRect = enemyObj.getBoundingClientRect();
+        const aRect = container.getBoundingClientRect();
+        const cx = eRect.left - aRect.left + eRect.width / 2;
+        const cy = eRect.top - aRect.top + eRect.height / 2;
+
+        for (let i = 0; i < count; i++) {
+            const pt = document.createElement('div');
+            pt.className = 'particle';
+            const s = size * (0.4 + Math.random() * 0.8);
+            pt.style.width = s + 'px';
+            pt.style.height = s + 'px';
+            pt.style.background = color;
+            pt.style.boxShadow = `0 0 ${s}px ${color}`;
+            pt.style.left = cx + 'px';
+            pt.style.top = cy + 'px';
+            
+            const angle = Math.random() * Math.PI * 2;
+            const dist = spread * (0.2 + Math.random() * 0.8);
+            const tx = Math.cos(angle) * dist;
+            const ty = Math.sin(angle) * dist;
+            
+            // 파티클의 움직이는 시간(투사체 지속)을 후딜레이(ms)에 딱 맞춤
+            pt.animate([
+                { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
+                { transform: `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px)) scale(0)`, opacity: 0 }
+            ], {
+                duration: ms,
+                easing: 'cubic-bezier(0.1, 0.8, 0.2, 1)',
+                fill: 'forwards'
+            });
+            
+            container.appendChild(pt);
+            setTimeout(() => pt.remove(), ms + 100);
+        }
+    }
+    function shakeEnemy() {
+        const e = document.getElementById('enemyContainer');
+        e.style.animation = 'none'; void e.offsetWidth;
+        e.style.animation = 'shake .4s';
+    }
+    function shakeScreen() {
+        const a = document.getElementById('arena');
+        a.style.animation = 'none'; void a.offsetWidth;
+        a.style.animation = 'shake .3s';
+    }
+
+    function addLog(msg, type) {
+        const body = document.getElementById('logBody');
+        const div = document.createElement('div');
+        div.className = `log-entry ${type}`;
+        const t = new Date();
+        div.innerHTML = `<span class="time">${t.getMinutes().toString().padStart(2,'0')}:${t.getSeconds().toString().padStart(2,'0')}</span>${msg}`;
+        body.appendChild(div);
+        body.scrollTop = body.scrollHeight;
+        if (body.children.length > 200) body.firstChild.remove();
+    }
+
+    function flashMatrixCard(rxId) {
+        const card = document.querySelector(`[data-rx="${rxId}"]`);
+        if (card) { card.classList.remove('active'); void card.offsetWidth; card.classList.add('active');
+            setTimeout(() => card.classList.remove('active'), 600); }
+    }
+
+    function updateUI() {
+        const ch = curChar();
+        const el = curElement();
+        const enemy = state.enemy;
+
+        // Update Stats
+        const attachStats = document.getElementById('attachStats');
+        if (state.lastAttach) {
+            attachStats.style.opacity = '1';
+            if (state.lastAttach.active) {
+                const elapsedOpts = (Date.now() - state.lastAttach.startTime) / 1000;
+                state.lastAttach.dps = elapsedOpts > 0 ? (state.lastAttach.totalDmg / elapsedOpts).toFixed(0) : 0;
+            }
+            document.getElementById('statElName').textContent = elName(state.lastAttach.element);
+            document.getElementById('statElName').style.color = elColor(state.lastAttach.element);
+            document.getElementById('attachDmg').textContent = state.lastAttach.totalDmg.toLocaleString();
+            document.getElementById('attachDps').textContent = Number(state.lastAttach.dps).toLocaleString();
+            
+            // 최고기록 업데이트 (UI)
+            document.getElementById('hiSingleDmg').textContent = enemy.maxSingleDmg.toLocaleString();
+            document.getElementById('hiAttachDmg').textContent = enemy.maxAttachDmg.toLocaleString();
+            
+        } else {
+            attachStats.style.opacity = '0';
+        }
+
+        // Player shape
+        const ps = document.getElementById('playerShape');
+        ps.style.background = `linear-gradient(135deg, ${elColor(el)}cc, ${elColor(el)}66)`;
+        ps.style.boxShadow = `0 0 20px ${elColor(el)}44`;
+        ps.textContent = ELEMENTS[el].icon;
+        document.getElementById('playerName').textContent = `${ELEMENTS[el].name} 캐릭터`;
+        document.getElementById('playerName').style.color = elColor(el);
+        document.getElementById('playerElement').textContent = `[${ELEMENTS[el].key}] ${el.toUpperCase()}`;
+
+        // Update Guides
+        const guideE = document.getElementById('guideE');
+        const guideQ = document.getElementById('guideQ');
+        guideE.style.display = ch.sp >= CFG.SKILL_COST ? 'flex' : 'none';
+        guideQ.style.display = ch.up >= CFG.ULT_COST ? 'flex' : 'none';
+        
+        // Enemy
+        document.getElementById('enemyHpFill').style.width = `${(enemy.hp / enemy.maxHp) * 100}%`;
+        document.getElementById('enemyHpText').textContent = `${enemy.hp} / ${enemy.maxHp}`;
+        const es = document.getElementById('enemyShape');
+        if (enemy.frozen) { es.style.background = '#38bdf8'; es.style.outline = '3px solid #7dd3fc'; es.style.outlineOffset = '4px'; }
+        else if (enemy.chaos) { es.style.background = `linear-gradient(135deg, #9f1239, #881337)`; es.style.outline = '3px solid #f43f5e'; es.style.outlineOffset = '4px'; }
+        else if (enemy.attached) {
+            const c = elColor(enemy.attached.element);
+            es.style.background = `linear-gradient(135deg, ${c}dd, ${c}55)`;
+            es.style.outline = `3px solid ${c}`;
+            es.style.outlineOffset = '4px';
+        }
+        else { es.style.background = 'linear-gradient(135deg, #1f2937, #374151)'; es.style.outline = 'none'; }
+        
+        if (enemy.defDown) es.style.boxShadow = '0 0 20px #6366f1';
+        else es.style.boxShadow = 'none';
+        
+        let innerText = 'ENEMY';
+        if (enemy.frozen) innerText = '❄️ FROZEN';
+        else if (enemy.chaos) innerText = '🌀 CHAOS';
+        else if (enemy.attached) innerText = `🎯 ${elName(enemy.attached.element)} 부착`;
+        document.getElementById('enemyInner').textContent = innerText;
+        // Status tray
+        const tray = document.getElementById('statusTray');
+        tray.innerHTML = '';
+        enemy.stacks.forEach(s => {
+            if (s.gauge <= 0) return;
+            const badge = document.createElement('div');
+            badge.className = 'status-badge';
+            badge.style.background = elColor(s.element);
+            badge.style.color = (s.element === 'light' || s.element === 'ice') ? '#000' : '#fff';
+            badge.style.opacity = '0.5';
+            badge.innerHTML = `${elName(s.element)}<div class="gauge-bar"><div class="gauge-val">${s.gauge}</div><div class="gauge-fill" style="width:${s.gauge}%;background:${elColor(s.element)}"></div></div>`;
+            tray.appendChild(badge);
+        });
+        if (enemy.attached) {
+            const badge = document.createElement('div');
+            badge.className = 'status-badge';
+            badge.style.background = elColor(enemy.attached.element);
+            badge.style.color = (enemy.attached.element === 'light' || enemy.attached.element === 'ice') ? '#000' : '#fff';
+            badge.style.boxShadow = `0 0 12px ${elColor(enemy.attached.element)}`;
+            badge.style.transform = 'scale(1.2)';
+            badge.style.margin = '0 10px';
+            badge.innerHTML = `${elName(enemy.attached.element)}<div class="gauge-bar"><div class="gauge-val">${enemy.attached.remaining}s</div><div class="gauge-fill" style="width:${(enemy.attached.remaining / CFG.ATTACH_DURATION) * 100}%;background:#fff"></div></div>`;
+            tray.appendChild(badge);
+        }
+        if (enemy.chaos) {
+            const badge = document.createElement('div');
+            badge.className = 'status-badge';
+            badge.style.background = '#9f1239';
+            badge.textContent = '혼돈';
+            tray.appendChild(badge);
+        }
+        // SP/UP
+        document.getElementById('spFill').style.width = `${(ch.sp / CFG.SP_MAX) * 100}%`;
+        document.getElementById('upFill').style.width = `${(ch.up / CFG.UP_MAX) * 100}%`;
+        document.getElementById('spVal').textContent = `${ch.sp} / ${CFG.SP_MAX}`;
+        document.getElementById('upVal').textContent = `${ch.up} / ${CFG.UP_MAX}`;
+        
+        const lck = state.lockedBy;
+        const eCanCancel = lck === 'combo' || lck === 'charged';
+        const qCanCancel = lck === 'combo' || lck === 'charged' || lck === 'skill';
+        const canE = (ch.sp >= CFG.SKILL_COST) && (lck === null || eCanCancel);
+        const canQ = (ch.up >= CFG.ULT_COST) && (lck === null || qCanCancel);
+        const canAtk = (lck === null);
+
+        document.getElementById('keyE').classList.toggle('disabled', !canE);
+        document.getElementById('keyQ').classList.toggle('disabled', !canQ);
+        const kl = document.getElementById('keyLmb'); if(kl) kl.classList.toggle('disabled', !canAtk);
+        const kh = document.getElementById('keyHold'); if(kh) kh.classList.toggle('disabled', !canAtk);
+        // Combo
+        document.getElementById('comboNum').textContent = state.combo;
+        document.getElementById('comboNum').style.color = state.combo > 0 ? elColor(el) : 'var(--physical)';
+        // Char slots
+        document.querySelectorAll('.char-slot').forEach((slot, i) => {
+            const c = state.characters[i];
+            const isE = c.sp >= CFG.SKILL_COST;
+            const isQ = c.up >= CFG.ULT_COST;
+            
+            slot.classList.toggle('active', i === state.activeChar);
+            
+            if (isQ) {
+                slot.style.background = '#f59e0b';
+                slot.style.color = '#111';
+                slot.style.borderColor = '#f59e0b';
+            } else if (isE) {
+                slot.style.background = '#10b981';
+                slot.style.color = '#fff';
+                slot.style.borderColor = '#10b981';
+            } else {
+                slot.style.background = 'transparent';
+                slot.style.color = elColor(c.element);
+                slot.style.borderColor = (i === state.activeChar) ? elColor(c.element) : 'var(--border)';
+            }
+            // 텍스트는 색상이 적용되었으므로 그대로 유지
+        });
+        // Matrix highlight
+        updateMatrixHighlights();
+    }
+
+    function updateMatrixHighlights() {
+        const hostEls = [];
+        if (state.enemy.attached) hostEls.push(state.enemy.attached.element);
+        if (state.enemy.chaos) hostEls.push('chaos');
+
+        document.querySelectorAll('.rx-card').forEach(card => {
+            const rxId = card.dataset.rx;
+            const rx = REACTIONS.find(r => r.id === rxId);
+            if (!rx) return;
+            let possible = false;
+            for (const h of hostEls) {
+                if (findReaction(h, curElement())?.id === rxId) possible = true;
+            }
+            card.classList.toggle('possible', possible);
+        });
+    }
+
+    // ======== INIT UI ========
+    function initCharSlots() {
+        const container = document.getElementById('charSlots');
+        container.innerHTML = '';
+        state.characters.forEach((c, i) => {
+            const el = c.element;
+            const slot = document.createElement('div');
+            slot.className = 'char-slot';
+            slot.style.color = elColor(el);
+            slot.innerHTML = `${ELEMENTS[el].icon}<span class="key-hint">${i + 1}</span>`;
+            slot.onclick = () => switchChar(i);
+            container.appendChild(slot);
+        });
+    }
+
+    function initMatrix() {
+        const body = document.getElementById('matrixBody');
+        REACTIONS.forEach(rx => {
+            const card = document.createElement('div');
+            card.className = 'rx-card';
+            card.dataset.rx = rx.id;
+            let formula = '';
+            if (rx.a === '_elem4') formula = `원소4종 + ${elName(rx.b)}`;
+            else if (rx.b === '_elem4') formula = `${rx.a === '_chaos' ? '혼돈' : elName(rx.a)} + 원소4종`;
+            else formula = `${elName(rx.a)} ↔ ${elName(rx.b)}`;
+            card.innerHTML = `<span class="rx-priority">P${rx.prio}</span>
+                <div class="rx-name" style="color:${rx.color}">${rx.name} (${rx.nameEn})</div>
+                <div class="rx-formula">${formula}</div>
+                <div class="rx-effect">${rx.effect}</div>`;
+            body.appendChild(card);
+        });
+    }
+
+    function switchChar(idx) {
+        state.activeChar = idx;
+        state.combo = 0;
+        addLog(`캐릭터 교체: ${elName(curElement())}`, 'system');
+        updateUI();
+    }
+
+    function startGame() {
+        const el1 = document.getElementById('slot1').value;
+        const el2 = document.getElementById('slot2').value;
+        const el3 = document.getElementById('slot3').value;
+        state.characters = [
+            { element: el1, sp: 0, up: 0 },
+            { element: el2, sp: 0, up: 0 },
+            { element: el3, sp: 0, up: 0 }
+        ];
+        document.getElementById('setupScreen').style.display = 'none';
+        document.getElementById('appContainer').style.display = 'flex';
+        initCharSlots();
+        state.activeChar = 0;
+        
+        state.enemy.hp = CFG.ENEMY_HP;
+        state.enemy.stacks = [];
+        state.enemy.frozen = false; state.enemy.chaos = false;
+        state.enemy.defDown = false;
+        state.enemy.maxSingleDmg = 0; state.enemy.maxAttachDmg = 0;
+        clearTimeout(state.enemy.frozenTimer);
+        clearTimeout(state.enemy.chaosTimer);
+        clearTimeout(state.enemy.defDownTimer);
+        state.combo = 0;
+        state.zones.forEach(z => z.el?.remove());
+        state.zones = [];
+        document.getElementById('logBody').innerHTML = '';
+        addLog('파티 편성 완료. 전투를 시작합니다!', 'system');
+        updateUI();
+    }
+
+    function resetAll() {
+        document.getElementById('setupScreen').style.display = 'flex';
+        document.getElementById('appContainer').style.display = 'none';
+    }
+
+    // ======== INPUT HANDLING ========
+    function setupInput() {
+        const arena = document.getElementById('arenaMain');
+        arena.addEventListener('mousedown', e => {
+            if (e.button !== 0 || state.lockedBy !== null) return;
+            state.mouseDownTime = Date.now();
+            state.isCharging = false;
+            state.chargeInterval = setInterval(() => {
+                const elapsed = Date.now() - state.mouseDownTime;
+                const pct = clamp((elapsed / CFG.CHARGE_TIME) * 100, 0, 100);
+                document.getElementById('chargeFill').style.width = `${pct}%`;
+                if (elapsed >= CFG.CHARGE_TIME) state.isCharging = true;
+            }, 30);
+        });
+        arena.addEventListener('mouseup', e => {
+            if (e.button !== 0) return;
+            clearInterval(state.chargeInterval);
+            document.getElementById('chargeFill').style.width = '0%';
+            if (state.lockedBy !== null) {
+                state.isCharging = false;
+                return;
+            }
+            if (state.isCharging) {
+                doChargedAttack();
+            } else {
+                doComboAttack();
+            }
+            state.isCharging = false;
+        });
+        arena.addEventListener('mouseleave', () => {
+            clearInterval(state.chargeInterval);
+            document.getElementById('chargeFill').style.width = '0%';
+            state.isCharging = false;
+        });
+        document.addEventListener('keydown', e => {
+            if (e.repeat) return;
+            const k = e.key.toLowerCase();
+            const lck = state.lockedBy;
+
+            if (k >= '1' && k <= '3') {
+                if (lck === 'skill' || lck === 'ult') return;
+                const idx = parseInt(k) - 1;
+                if (idx < state.characters.length) switchChar(idx);
+            }
+            else if (k === 'e') {
+                if (lck === 'skill' || lck === 'ult') return;
+                doSkill();
+            }
+            else if (k === 'q') {
+                if (lck === 'ult') return;
+                doUltimate();
+            }
+        });
+        arena.addEventListener('contextmenu', e => e.preventDefault());
+    }
+
+    // ======== BOOT ========
+    function init() {
+        initMatrix();
+        setupInput();
+        startGaugeDecay();
+    }
+    init();
+    </script>
+    </div>
+</body>
+</html>
