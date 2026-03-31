@@ -361,8 +361,8 @@
     function gainEnergy(spGain, upGain) {
         state.characters.forEach((c, i) => {
             const mult = (i === state.activeChar) ? 1 : 0.1;
-            c.sp = clamp(c.sp + Math.round(spGain * mult), 0, CFG.SP_MAX);
-            c.up = clamp(c.up + Math.round(upGain * mult), 0, CFG.UP_MAX);
+            c.sp = clamp(c.sp + Math.ceil(spGain * mult), 0, CFG.SP_MAX);
+            c.up = clamp(c.up + Math.ceil(upGain * mult), 0, CFG.UP_MAX);
         });
     }
     function elColor(el) { return ELEMENTS[el]?.color || '#fff'; }
