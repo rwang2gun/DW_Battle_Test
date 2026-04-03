@@ -197,10 +197,11 @@
         .glow-pulse { animation: glowPulse 1.5s infinite alternate; }
         @keyframes glowPulse { from { filter: brightness(1.2) saturate(1.5); } to { filter: brightness(2) saturate(2); } }
         @keyframes ultCutinFade { 
-            0% { opacity:0; transform:translateY(-80px) scale(0.95); filter: brightness(2); } 
-            100% { opacity:1; transform:translateY(-70px) scale(1); filter: brightness(1.1); } 
+            0% { opacity:0; transform:translateY(-20px) scale(0.95); filter: brightness(2); } 
+            100% { opacity:1; transform:translateY(0) scale(1); filter: brightness(1.1); } 
         }
-        .ult-cutin-layer { position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:10000; pointer-events:none; background: rgba(0,0,0,0.4); }
+        .ult-cutin-layer { position:absolute; inset:0; margin:auto; height:500px; max-height:100%; aspect-ratio:16/9; max-width:100%;
+            display:none; align-items:center; justify-content:center; z-index:10000; pointer-events:none; background: rgba(0,0,0,0.4); overflow:hidden; }
         .ult-cutin-layer.show { display:flex; animation: ultCutinFade 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
         .particle { position:absolute; border-radius:50%; pointer-events:none; z-index:40; mix-blend-mode:screen; }
     </style>
@@ -231,10 +232,7 @@
         <button onclick="startGame()" style="padding:15px 40px; font-size:1.2rem; font-weight:800; border-radius:8px; background:linear-gradient(90deg, #3b82f6, #2563eb); color:#fff; border:none; cursor:pointer; box-shadow:0 4px 15px rgba(37,99,235,0.4);">전투 시작</button>
     </div>
     
-    <!-- Cinematic Ult Overlay -->
-    <div id="ultCutinLayer" class="ult-cutin-layer">
-        <img id="ultCutinImg" src="" style="height:600px; width:100vw; object-fit:contain; border:none; outline:none;">
-    </div>
+
 
     <div id="appContainer" style="display:none; flex-direction:column; height:100vh;">
     <!-- TOP BAR -->
@@ -277,6 +275,10 @@
                 </div>
             </div>
             <div class="arena-bg"></div>
+            <!-- Cinematic Ult Overlay (Matched with BG Size) -->
+            <div id="ultCutinLayer" class="ult-cutin-layer">
+                <img id="ultCutinImg" src="" style="height:100%; width:100%; object-fit:fill; border:none; outline:none;">
+            </div>
             <div class="arena-main" id="arenaMain">
                 <div class="shape-container" id="playerContainer">
                     <div id="playerGuides" style="position:absolute; bottom: 100%; margin-bottom: 5px; width:100%; display:flex; flex-direction:column; align-items:center; gap:4px; pointer-events:none; z-index:10;">
@@ -1032,6 +1034,11 @@
         const pImg = document.getElementById('playerImg');
         const pIcon = document.getElementById('playerIcon');
         
+        // Skill guide buttons (Hide only during Skill/Ult sequence)
+        const isHidingState = ['skill', 'ult_cutin', 'ult_prep', 'ult_strike'].includes(state.lockedBy);
+        document.getElementById('guideE').style.display = (!isHidingState && ch && ch.sp >= CFG.SKILL_COST) ? 'flex' : 'none';
+        document.getElementById('guideQ').style.display = (!isHidingState && ch && ch.up >= CFG.ULT_COST) ? 'flex' : 'none';
+        
         if (ch && ch.type === 'image') {
             let currentImg = ch.img;
             let imgHeight = '100%';
@@ -1043,16 +1050,12 @@
                 const lImg = document.getElementById('ultCutinImg');
                 if (lImg.src.indexOf(ch.imgUltCutin) === -1) lImg.src = ch.imgUltCutin;
                 
-                // PC03 전용 스케일 조정 (수평 10px 추가)
-                if (ch.id === 'PC_03') {
-                    lImg.style.width = 'calc(100vw + 10px)';
-                } else {
-                    lImg.style.width = '100vw';
-                }
+                // 모든 캐릭터 공통: 배경 프레임에 100% 맞춤
+                lImg.style.width = '100%';
                 
                 layer.classList.add('show');
                 
-                // 아레나 스프라이트는 숨김
+                // 아레나 스프라이트 숨김 (가이드는 위에서 통합 관리)
                 pImg.style.display = 'none';
                 ps.style.display = 'none';
                 return; // 컷신 모드일 때는 아래 일반 렌더링 무시
@@ -1203,9 +1206,6 @@
         document.getElementById('upVal').textContent = `${ch.up} / ${CFG.UP_MAX}`;
         document.getElementById('keyE').classList.toggle('disabled', ch.sp < CFG.SKILL_COST);
         document.getElementById('keyQ').classList.toggle('disabled', ch.up < CFG.ULT_COST);
-        // Skill guide buttons
-        document.getElementById('guideE').style.display = ch.sp >= CFG.SKILL_COST ? 'flex' : 'none';
-        document.getElementById('guideQ').style.display = ch.up >= CFG.ULT_COST ? 'flex' : 'none';
         // Combo
         document.getElementById('comboNum').textContent = state.combo;
         document.getElementById('comboNum').style.color = state.combo > 0 ? elColor(el) : 'var(--physical)';
