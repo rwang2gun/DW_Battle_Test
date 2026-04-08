@@ -337,7 +337,6 @@ class SimulationEngine {
     start() {
         if (this.isRunning) return;
         
-        this.maxTime = parseFloat(document.getElementById('sim-duration').value) || 10;
         this.target.reset();
         const logContainer = document.getElementById('battle-log');
         if (logContainer) logContainer.innerHTML = '';
@@ -347,7 +346,6 @@ class SimulationEngine {
         this.hitQueue = [];
         this.lastCastTime = { 'a1': -999, 'a2': -999, 'b1': -999, 'b2': -999 };
         
-        // 버튼 쿨다운 텍스트 원상복구
         this.syncHud();
         ['a1', 'a2', 'b1', 'b2'].forEach(id => {
             const btn = document.getElementById(`btn-cast-${id}`);
@@ -355,31 +353,13 @@ class SimulationEngine {
         });
 
         this.updateActiveUi();
-        
         this.isRunning = true;
         this.tick();
-        
-        const btnStart = document.getElementById('btn-start');
-        if (btnStart) {
-            btnStart.textContent = '⚔️ 전투 진행 중...';
-            btnStart.classList.add('running');
-        }
     }
 
     stop() {
         this.isRunning = false;
         if (this.timerId) clearTimeout(this.timerId);
-        
-        // Log final if max timer reached
-        if (this.currentTime >= this.maxTime) {
-            this.log(this.currentTime, `시뮬레이션 완료. 최종 피해: ${Math.floor(this.target.totalDamageTaken)}`);
-        }
-        
-        const btnStart = document.getElementById('btn-start');
-        if (btnStart) {
-            btnStart.textContent = '전투 시작 (Start)';
-            btnStart.classList.remove('running');
-        }
     }
 
     reset() {
@@ -430,11 +410,7 @@ class SimulationEngine {
 
         this.updateCooldownUi();
 
-        if (this.currentTime >= this.maxTime) {
-            this.stop();
-        } else {
-            this.timerId = setTimeout(() => this.tick(), TICK_MS);
-        }
+        this.timerId = setTimeout(() => this.tick(), TICK_MS);
     }
 
     updateCooldownUi() {
@@ -460,7 +436,10 @@ class SimulationEngine {
     }
 
     castSkill(id, label) {
-        if (!this.isRunning) return;
+        if (this.mode !== 'combat') return;
+
+        // 스킬 사용 시 자동 시작
+        if (!this.isRunning) this.start();
 
         const cd = parseFloat(document.getElementById(`skill-${id}-cd`).value) || 0;
         if (this.currentTime < this.lastCastTime[id] + cd) {
@@ -546,6 +525,30 @@ const engine = new SimulationEngine();
 // UI Event Bindings
 document.getElementById('btn-toggle-mode').addEventListener('click', () => engine.toggleMode());
 
+// 초기값 복원
+document.getElementById('btn-defaults').addEventListener('click', () => {
+    if (engine.mode !== 'setup') return;
+    document.querySelectorAll('#view-setup input, #view-setup select, .global-controls input').forEach(el => {
+        if (el.tagName === 'SELECT') {
+            // select는 defaultSelected 속성이 있는 option을 선택
+            for (const opt of el.options) {
+                if (opt.defaultSelected) { el.value = opt.value; break; }
+            }
+        } else {
+            el.value = el.defaultValue;
+        }
+    });
+    // 반응 드롭다운도 기화로 복원
+    const reactSel = document.getElementById('reaction-selector');
+    if (reactSel) {
+        reactSel.value = 'vaporize';
+        reactSel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    engine.updateSkillSummaries();
+    engine.syncHud();
+    showToast("🔄 모든 설정이 초기값으로 복원되었습니다.");
+});
+
 const STORAGE_KEY = 'ag_combat_config';
 let toastTimeout = null;
 function showToast(msg) {
@@ -594,20 +597,18 @@ document.getElementById('btn-load').addEventListener('click', () => {
     }
 });
 
-// Setup 모드 내 인풋 변경 시 실시간 반영
+// Setup 모드 내 인풀 변경 시 실시간 반영
 document.getElementById('view-setup').addEventListener('input', () => {
     engine.updateSkillSummaries();
     engine.syncHud();
+    updateReactionSummary();
 });
 document.addEventListener('DOMContentLoaded', () => {
     engine.updateSkillSummaries();
     engine.syncHud();
+    updateReactionSummary();
 });
 
-document.getElementById('btn-start').addEventListener('click', () => {
-    if (engine.isRunning) engine.stop();
-    else engine.start();
-});
 document.getElementById('btn-reset').addEventListener('click', () => engine.reset());
 
 // 탭 클릭 이벤트 추가
@@ -682,4 +683,45 @@ document.getElementById('reaction-selector').addEventListener('change', (e) => {
     document.querySelectorAll('.reaction-config').forEach(el => el.style.display = 'none');
     const selectedConfig = document.getElementById(`config-${e.target.value}`);
     if (selectedConfig) selectedConfig.style.display = 'block';
+    updateReactionSummary();
 });
+
+
+function updateReactionSummary() {
+    const summaryEl = document.getElementById('reaction-summary-text');
+    if (!summaryEl) return;
+    const type = document.getElementById('reaction-selector').value;
+
+    let html = '';
+    if (type === 'vaporize') {
+        const fwMult = document.getElementById('react-fw-mult').value;
+        const fwCd   = document.getElementById('react-fw-cd').value;
+        const wfMult = document.getElementById('react-wf-mult').value;
+        const wfCd   = document.getElementById('react-wf-cd').value;
+        html = `💨 <b style="color:white;">기화 (Vaporize)</b> — 화·수 속성이 겹치면 피해량을 증폭합니다.<br>
+🔥 Host → 💧 Trigger&nbsp;&nbsp;<span style="color:#fbbf24;">x${fwMult}</span> &nbsp;|&nbsp; CD: ${fwCd}s<br>
+💧 Host → 🔥 Trigger&nbsp;&nbsp;<span style="color:#fbbf24;">x${wfMult}</span> &nbsp;|&nbsp; CD: ${wfCd}s`;
+    } else if (type === 'melt') {
+        const fiMult = document.getElementById('react-fi-mult').value;
+        const fiCd   = document.getElementById('react-fi-cd').value;
+        const ifMult = document.getElementById('react-if-mult').value;
+        const ifCd   = document.getElementById('react-if-cd').value;
+        html = `🌡️ <b style="color:white;">융해 (Melt)</b> — 화·빙 속성이 겹치면 피해량을 증폭합니다.<br>
+🔥 Host → ❄️ Trigger&nbsp;&nbsp;<span style="color:#fbbf24;">x${fiMult}</span> &nbsp;|&nbsp; CD: ${fiCd}s<br>
+❄️ Host → 🔥 Trigger&nbsp;&nbsp;<span style="color:#fbbf24;">x${ifMult}</span> &nbsp;|&nbsp; CD: ${ifCd}s`;
+    } else if (type === 'freeze') {
+        const wiCd  = document.getElementById('react-wi-cd').value;
+        const iwCd  = document.getElementById('react-iw-cd').value;
+        const sMult = document.getElementById('react-shatter-mult').value;
+        const sCd   = document.getElementById('react-shatter-cd').value;
+        html = `🧊 <b style="color:white;">빙결 (Freeze)</b> — 수·빙 속성이 겹치면 대상이 Frozen 상태로 전환됩니다.<br>
+💧 Host → ❄️ Trigger&nbsp;&nbsp;CD: ${wiCd}s<br>
+❄️ Host → 💧 Trigger&nbsp;&nbsp;CD: ${iwCd}s<br>
+⚔️ <b style="color:#a78bfa;">쇄빙 (Shatter)</b> — Frozen 상태에서 물리 타격 시 피해 <span style="color:#fbbf24;">x${sMult}</span> 증폭 (CD: ${sCd}s), 빙결 즉시 해제`;
+    }
+    summaryEl.innerHTML = html;
+}
+
+// 초기 요약 렌더링
+updateReactionSummary();
+

@@ -16,7 +16,6 @@
                 <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;" id="mode-indicator">현재 모드: Setup Mode</div>
             </div>
             <div class="global-controls">
-                <label>시뮬레이션(초): <input type="number" id="sim-duration" value="60" min="1" max="60"></label>
                 <label>자연감소(초당): <input type="number" id="decay-rate" value="30" min="0" max="100"></label>
                 <label>최대 부착량: <input type="number" id="max-gauge" value="1000" min="10"></label>
                 <label>부착 ICD(초): <input type="number" id="global-icd" value="1" min="0" step="0.1"></label>
@@ -24,6 +23,7 @@
                 <div class="actions" style="display:flex; gap:8px;">
                     <button id="btn-save" class="btn btn-secondary" title="현재 브라우저 캐시에 설정 임시 저장">💾 캐시 저장</button>
                     <button id="btn-load" class="btn btn-secondary" title="브라우저 캐시에서 설정 불러오기">📂 캐시 로드</button>
+                    <button id="btn-defaults" class="btn btn-secondary" title="모든 설정을 초기값으로 복원">🔄 초기값</button>
                     <button id="btn-toggle-mode" class="btn btn-secondary">시뮬레이션 화면으로 ➔</button>
                 </div>
             </div>
@@ -35,6 +35,12 @@
                 <!-- 반응 세팅 -->
                 <div class="panel glass-panel">
                     <h2>⚙️ Reaction Matrix</h2>
+
+                    <!-- 반응 동작 요약 -->
+                    <div id="reaction-summary" style="margin-bottom:10px; padding:8px 10px; background:rgba(0,0,0,0.3); border-radius:8px; border:1px solid var(--panel-border);">
+                        <div style="font-size:0.7rem; color:var(--text-muted); line-height:1.8;" id="reaction-summary-text"></div>
+                    </div>
+
                     <div class="form-row">
                         <label>적용 반응:</label>
                         <select id="reaction-selector">
@@ -175,9 +181,14 @@
             <div class="combat-grid">
                 
                 <!-- Left: Arena + HUD Tab -->
-                <main class="arena glass-panel flex-col" style="justify-content: flex-start; padding-top: 30px;">
+                <main class="arena glass-panel flex-col" style="justify-content: flex-start; padding-top: 12px;">
+                    <!-- 조작 키 가이드 -->
+                    <div style="display:flex; gap:12px; font-size:0.65rem; color:var(--text-muted); margin-bottom:6px; flex-wrap:wrap; justify-content:center;">
+                        <span>⌨️ <b style="color:white;">1</b> Char A &nbsp; <b style="color:white;">2</b> Char B</span>
+                        <span>🎯 <b style="color:white;">Q</b> 궁극기 &nbsp; <b style="color:white;">E</b> 일반 스킬</span>
+                    </div>
                     <!-- Target Area -->
-                    <div class="target-container" style="flex: 1; min-height: 250px;">
+                    <div class="target-container" style="flex: 1; min-height: 160px;">
                         <div id="dummy-target" class="dummy-target">
                             <div class="orbit-ring"></div>
                             <span class="crosshair">⌖</span>
@@ -204,15 +215,15 @@
                         
                         <div class="tab-content color-fire-theme active" id="tab-content-a">
                             <div class="hud-buttons">
-                                <button class="btn btn-hud" id="btn-cast-a1"><span style="font-size: 1.2rem; margin-bottom:4px">Q</span> <span class="hud-sub" id="hud-a1-desc">0</span></button>
-                                <button class="btn btn-hud" id="btn-cast-a2"><span style="font-size: 1.2rem; margin-bottom:4px">E</span> <span class="hud-sub" id="hud-a2-desc">0</span></button>
+                                <button class="btn btn-hud" id="btn-cast-a1"><span style="font-size:0.7rem; opacity:0.6;">Q</span><span style="font-size:0.85rem; font-weight:700; margin:2px 0;">궁극기</span><span class="hud-sub" id="hud-a1-desc">0</span></button>
+                                <button class="btn btn-hud" id="btn-cast-a2"><span style="font-size:0.7rem; opacity:0.6;">E</span><span style="font-size:0.85rem; font-weight:700; margin:2px 0;">일반</span><span class="hud-sub" id="hud-a2-desc">0</span></button>
                             </div>
                         </div>
                         
                         <div class="tab-content color-water-theme" id="tab-content-b" style="display:none;">
                             <div class="hud-buttons">
-                                <button class="btn btn-hud" id="btn-cast-b1"><span style="font-size: 1.2rem; margin-bottom:4px">Q</span> <span class="hud-sub" id="hud-b1-desc">0</span></button>
-                                <button class="btn btn-hud" id="btn-cast-b2"><span style="font-size: 1.2rem; margin-bottom:4px">E</span> <span class="hud-sub" id="hud-b2-desc">0</span></button>
+                                <button class="btn btn-hud" id="btn-cast-b1"><span style="font-size:0.7rem; opacity:0.6;">Q</span><span style="font-size:0.85rem; font-weight:700; margin:2px 0;">궁극기</span><span class="hud-sub" id="hud-b1-desc">0</span></button>
+                                <button class="btn btn-hud" id="btn-cast-b2"><span style="font-size:0.7rem; opacity:0.6;">E</span><span style="font-size:0.85rem; font-weight:700; margin:2px 0;">일반</span><span class="hud-sub" id="hud-b2-desc">0</span></button>
                             </div>
                         </div>
                     </div>
@@ -221,8 +232,7 @@
                 <!-- Right: Logs & Controls -->
                 <aside class="panel glass-panel flex-col" style="max-height: 100%;">
                     <div class="arena-controls" style="display:flex; gap:10px; margin-bottom: 15px;">
-                        <button id="btn-start" class="btn btn-primary" style="flex:1; font-size: 1.1rem; padding: 12px; transition: 0.2s;">전투 시작 (Start)</button>
-                        <button id="btn-reset" class="btn btn-secondary" style="padding: 12px;">Reset</button>
+                        <button id="btn-reset" class="btn btn-secondary" style="flex:1; padding: 10px;">🔄 Reset</button>
                     </div>
                     
                     <h2 style="margin-top: 10px;">📜 Battle Log</h2>
