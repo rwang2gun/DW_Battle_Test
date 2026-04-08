@@ -12,7 +12,7 @@
         <!-- 상단 헤더 -->
         <header class="glass-panel main-header">
             <div>
-                <h1>🔥💧 Elemental Combat</h1>
+                <h1>🔥💧❄️ Elemental Combat</h1>
                 <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;" id="mode-indicator">현재 모드: Setup Mode</div>
             </div>
             <div class="global-controls">
@@ -38,12 +38,13 @@
                     <div class="form-row">
                         <label>적용 반응:</label>
                         <select id="reaction-selector">
-                            <option value="vaporize" selected>기화 (Vaporize)</option>
-                            <option value="melt" disabled>융해 (Melt - 미구현)</option>
+                            <option value="vaporize" selected>💨 기화 (Vaporize)</option>
+                            <option value="melt">🌡️ 융해 (Melt)</option>
+                            <option value="freeze">🧊 빙결 (Freeze)</option>
                         </select>
                     </div>
                     
-                    <!-- 속성 반응 매트릭스 1 (기화) -->
+                    <!-- 기화 (Vaporize): Fire ↔ Water -->
                     <div class="reaction-config" id="config-vaporize">
                         <h3 style="margin-top: 15px; color:var(--color-fire);">🔥 Host → 💧 Trigger</h3>
                         <div class="form-row"><label>반응 쿨다운(초):</label><input type="number" id="react-fw-cd" value="1.0" min="0" step="0.1"></div>
@@ -55,6 +56,35 @@
                         <div class="form-row"><label>피해량 배수:</label><input type="number" id="react-wf-mult" value="1.5" step="0.1"></div>
                         <div class="form-row"><label>기존 부착 게이지 소모율:</label><input type="number" id="react-wf-consume" value="0.5" step="0.1"></div>
                     </div>
+
+                    <!-- 융해 (Melt): Fire ↔ Ice -->
+                    <div class="reaction-config" id="config-melt" style="display:none;">
+                        <h3 style="margin-top: 15px; color:var(--color-fire);">🔥 Host → ❄️ Trigger</h3>
+                        <div class="form-row"><label>반응 쿨다운(초):</label><input type="number" id="react-fi-cd" value="1.0" min="0" step="0.1"></div>
+                        <div class="form-row"><label>피해량 배수:</label><input type="number" id="react-fi-mult" value="1.5" step="0.1"></div>
+                        <div class="form-row"><label>기존 부착 게이지 소모율:</label><input type="number" id="react-fi-consume" value="0.5" step="0.1"></div>
+                        
+                        <h3 style="margin-top: 15px; color:var(--color-ice);">❄️ Host → 🔥 Trigger</h3>
+                        <div class="form-row"><label>반응 쿨다운(초):</label><input type="number" id="react-if-cd" value="1.0" min="0" step="0.1"></div>
+                        <div class="form-row"><label>피해량 배수:</label><input type="number" id="react-if-mult" value="2.0" step="0.1"></div>
+                        <div class="form-row"><label>기존 부착 게이지 소모율:</label><input type="number" id="react-if-consume" value="1.0" step="0.1"></div>
+                    </div>
+
+                    <!-- 빙결 (Freeze): Water ↔ Ice → Frozen → Shatter -->
+                    <div class="reaction-config" id="config-freeze" style="display:none;">
+                        <h3 style="margin-top: 15px; color:var(--color-water);">💧 Host → ❄️ Trigger</h3>
+                        <div class="form-row"><label>반응 쿨다운(초):</label><input type="number" id="react-wi-cd" value="2.0" min="0" step="0.1"></div>
+                        <div class="form-row"><label>빙결 시 게이지 소모율:</label><input type="number" id="react-wi-consume" value="0.5" step="0.1"></div>
+                        
+                        <h3 style="margin-top: 15px; color:var(--color-ice);">❄️ Host → 💧 Trigger</h3>
+                        <div class="form-row"><label>반응 쿨다운(초):</label><input type="number" id="react-iw-cd" value="2.0" min="0" step="0.1"></div>
+                        <div class="form-row"><label>빙결 시 게이지 소모율:</label><input type="number" id="react-iw-consume" value="0.5" step="0.1"></div>
+                        
+                        <h3 style="margin-top: 15px; color:#a78bfa;">⚔️ 쇄빙 (Shatter)</h3>
+                        <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">Frozen 상태의 대상에 물리 피해 적중 시 쇄빙 반응이 발생합니다. 빙결 상태가 해제되며 게이지가 초기화됩니다.</p>
+                        <div class="form-row"><label>쇄빙 물리 피해 배수:</label><input type="number" id="react-shatter-mult" value="1.5" step="0.1"></div>
+                        <div class="form-row"><label>쇄빙 반응 쿨다운(초):</label><input type="number" id="react-shatter-cd" value="1.0" min="0" step="0.1"></div>
+                    </div>
                 </div>
 
                 <!-- 캐릭터 A -->
@@ -64,6 +94,7 @@
                         <select id="char-a-element">
                             <option value="Fire" selected>🔥 화 (Fire)</option>
                             <option value="Water">💧 수 (Water)</option>
+                            <option value="Ice">❄️ 빙 (Ice)</option>
                         </select>
                     </div>
                     <!-- 스킬 A1 (궁극기) -->
@@ -103,6 +134,7 @@
                         <select id="char-b-element">
                             <option value="Fire">🔥 화 (Fire)</option>
                             <option value="Water" selected>💧 수 (Water)</option>
+                            <option value="Ice">❄️ 빙 (Ice)</option>
                         </select>
                     </div>
                     <!-- 스킬 B1 (궁극기) -->
