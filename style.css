@@ -19,6 +19,10 @@
     --glow-none: rgba(51, 65, 85, 0.5);
 }
 
+/* 뷰포트 폭에 따라 root font-size 자동 스케일
+   600px → 11px | 900px → 14px | 1200px → 18px | 1440px+ → 20px (max 22px) */
+html { font-size: clamp(11px, 1.2vw + 3px, 22px); }
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
@@ -192,8 +196,75 @@ h3 { font-size: 0.8rem; margin-bottom: 6px; color: var(--text-muted); }
     .btn { padding: 4px 8px; font-size: 0.65rem; }
     .setup-grid { grid-template-columns: 1fr; gap: 8px; }
     .combat-grid { grid-template-columns: 1fr; grid-template-rows: 1fr auto; gap: 6px; }
-    /* 전투 로그 축소 우선 */
     .log-container { font-size: 0.55rem; max-height: 120px; }
     .stats-card { font-size: 0.65rem; }
     .stat-row { font-size: 0.65rem; }
+}
+
+/* 중형 화면 (900px+): 패딩/인풋/레이아웃 확장 */
+@media (min-width: 900px) {
+    .app-container { padding: 14px; gap: 14px; }
+    .main-header { padding: 10px 18px; }
+    .panel { padding: 14px; }
+    .character-card { padding: 14px; }
+    .skill-card { padding: 10px; }
+    .form-row { margin-bottom: 7px; }
+    input[type="number"] { width: 72px; padding: 5px 7px; }
+    .setup-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+    .combat-grid { grid-template-columns: 1fr 320px; gap: 14px; }
+    .target-container { width: 210px; height: 210px; }
+    .dummy-target { width: 105px; height: 105px; }
+    .orbit-ring { width: 163px; height: 163px; }
+    .attachment-ui { max-width: 340px; }
+    .hud-tabs-container { max-width: 460px; }
+}
+
+/* 대형 화면 (1100px+): 추가 레이아웃 확장 */
+@media (min-width: 1100px) {
+    .app-container { padding: 18px; gap: 16px; }
+    .main-header { padding: 12px 22px; }
+    .panel { padding: 18px; }
+    .character-card { padding: 16px; margin-bottom: 14px; }
+    .char-header { margin-bottom: 12px; padding-bottom: 12px; }
+    .skill-card { padding: 12px; }
+    .form-row { margin-bottom: 9px; }
+    input[type="number"] { width: 82px; }
+    .setup-grid { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 18px; }
+    .combat-grid { grid-template-columns: 1fr 360px; gap: 18px; }
+    .target-container { width: 240px; height: 240px; }
+    .dummy-target { width: 118px; height: 118px; }
+    .orbit-ring { width: 185px; height: 185px; }
+    .attachment-ui { max-width: 380px; margin-top: 20px; }
+    .gauge-bar-bg { height: 12px; border-radius: 6px; }
+    .hud-tabs-container { max-width: 500px; }
+    .tab-btn { padding: 10px; }
+    .tab-content { padding: 16px; }
+    .btn-hud { padding: 10px; }
+    .log-container { padding: 8px; }
+    .stats-card { margin-top: 14px; padding-top: 12px; }
+}
+
+/* 와이드 화면 (1400px+): 풀사이즈에 가까운 치수 */
+@media (min-width: 1400px) {
+    .app-container { padding: 22px; gap: 20px; }
+    .main-header { padding: 14px 28px; }
+    .panel { padding: 22px; }
+    .character-card { padding: 18px; margin-bottom: 18px; }
+    .skill-card { padding: 14px; }
+    .form-row { margin-bottom: 10px; }
+    input[type="number"] { width: 90px; padding: 6px 8px; }
+    .setup-grid { gap: 22px; }
+    .combat-grid { grid-template-columns: 1fr 400px; gap: 22px; }
+    .target-container { width: 270px; height: 270px; }
+    .dummy-target { width: 132px; height: 132px; }
+    .orbit-ring { width: 210px; height: 210px; }
+    .attachment-ui { max-width: 420px; margin-top: 28px; }
+    .gauge-bar-bg { height: 14px; border-radius: 7px; }
+    .hud-tabs-container { max-width: 540px; }
+    .tab-btn { padding: 12px; }
+    .tab-content { padding: 20px; }
+    .btn-hud { padding: 12px; }
+    .log-container { padding: 10px; gap: 4px; }
+    .stats-card { margin-top: 18px; padding-top: 14px; }
+    .stat-row { margin-bottom: 8px; }
 }
