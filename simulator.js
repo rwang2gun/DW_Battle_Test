@@ -7,8 +7,7 @@ class DummyTarget {
         this.gauge = 0;
         this.totalDamageTaken = 0;
         this.lastAttachTime = { 'a1': -999, 'a2': -999, 'b1': -999, 'b2': -999 };
-        this.lastReactionTime = { 'fw': -999, 'wf': -999 };
-        this.reactCount = 0;
+        this.lastReactionTime = { 'fw': -999, 'wf': -999, 'fi': -999, 'if': -999, 'wi': -999, 'iw': -999, 'shatter': -999 };
         this.updateVisuals();
     }
 
@@ -18,7 +17,7 @@ class DummyTarget {
         this.totalDamageTaken = 0;
         this.reactCount = 0;
         this.lastAttachTime = { 'a1': -999, 'a2': -999, 'b1': -999, 'b2': -999 };
-        this.lastReactionTime = { 'fw': -999, 'wf': -999 };
+        this.lastReactionTime = { 'fw': -999, 'wf': -999, 'fi': -999, 'if': -999, 'wi': -999, 'iw': -999, 'shatter': -999 };
         this.updateVisuals();
     }
 
@@ -37,7 +36,30 @@ class DummyTarget {
         const maxGauge = parseFloat(document.getElementById('max-gauge').value) || 1000;
         const icd = parseFloat(document.getElementById('global-icd').value) || 0;
         
-        // ICD 판정 통과 여부 및 임시 타격 검사
+        // === 쇄빙 (Shatter): Frozen 상태 + Physical 타격 ===
+        if (this.element === 'Frozen' && element === 'Physical') {
+            const shatterCd = parseFloat(document.getElementById('react-shatter-cd').value) || 0;
+            if (time >= this.lastReactionTime['shatter'] + shatterCd) {
+                const shatterMult = parseFloat(document.getElementById('react-shatter-mult').value) || 1.0;
+                const finalDamage = damage * shatterMult;
+                // 쇄빙: 빙결 해제 및 게이지 전체 초기화
+                this.element = 'None';
+                this.gauge = 0;
+                this.lastReactionTime['shatter'] = time;
+                this.reactCount++;
+                this.totalDamageTaken += finalDamage;
+                this.updateVisuals();
+                this.spawnDamageText(finalDamage, true, 'Physical');
+                return { damage: finalDamage, isReaction: true, reactionMsg: `쇄빙(x${shatterMult})` };
+            }
+            // 쇄빙 쿨다운 중: 일반 물리피해
+            this.totalDamageTaken += damage;
+            this.updateVisuals();
+            this.spawnDamageText(damage, false, 'Physical');
+            return { damage, isReaction: false, reactionMsg: '' };
+        }
+
+        // ICD 판정 통과 여부
         let passesAttachIcd = false;
         if (element !== 'Physical' && attachAmount > 0) {
             if (time >= this.lastAttachTime[skillLabel] + icd) {
@@ -52,50 +74,80 @@ class DummyTarget {
         let isCritical = false;
         let commitAttachIcd = false;
 
-        // 1. 체크: 반응 매트릭스 (기화)
-        // 조건: 실질 부착량이 존재하고, 서로 다른 속성이 겹칠 때
-        if (actualAttach > 0 && this.element !== 'None' && this.element !== element) {
+        // === 반응 매트릭스: 속성이 다르고 부착량이 있을 때 ===
+        if (actualAttach > 0 && this.element !== 'None' && this.element !== 'Frozen' && this.element !== element) {
             let mult = 1.0;
             let consumeRate = 1.0;
-            let isVaporize = false;
+            let reactPrefix = '';
+            let reactName = '';
+            let isAmplify = false;
+            let isFreeze = false;
 
+            // 기화 (Vaporize): Fire ↔ Water
             if (this.element === 'Fire' && element === 'Water') {
                 mult = parseFloat(document.getElementById('react-fw-mult').value) || 1.0;
                 consumeRate = parseFloat(document.getElementById('react-fw-consume').value) || 1.0;
-                isVaporize = true;
+                reactPrefix = 'fw'; reactName = '기화'; isAmplify = true;
             } else if (this.element === 'Water' && element === 'Fire') {
                 mult = parseFloat(document.getElementById('react-wf-mult').value) || 1.0;
                 consumeRate = parseFloat(document.getElementById('react-wf-consume').value) || 1.0;
-                isVaporize = true;
+                reactPrefix = 'wf'; reactName = '기화'; isAmplify = true;
+            }
+            // 융해 (Melt): Fire ↔ Ice
+            else if (this.element === 'Fire' && element === 'Ice') {
+                mult = parseFloat(document.getElementById('react-fi-mult').value) || 1.0;
+                consumeRate = parseFloat(document.getElementById('react-fi-consume').value) || 1.0;
+                reactPrefix = 'fi'; reactName = '융해'; isAmplify = true;
+            } else if (this.element === 'Ice' && element === 'Fire') {
+                mult = parseFloat(document.getElementById('react-if-mult').value) || 1.0;
+                consumeRate = parseFloat(document.getElementById('react-if-consume').value) || 1.0;
+                reactPrefix = 'if'; reactName = '융해'; isAmplify = true;
+            }
+            // 빙결 (Freeze): Water ↔ Ice
+            else if ((this.element === 'Water' && element === 'Ice') || (this.element === 'Ice' && element === 'Water')) {
+                reactPrefix = (this.element === 'Water') ? 'wi' : 'iw';
+                consumeRate = parseFloat(document.getElementById(`react-${reactPrefix}-consume`).value) || 0.5;
+                reactName = '빙결'; isFreeze = true;
             }
 
-            if (isVaporize) {
-                const reactPrefix = (this.element === 'Fire') ? 'fw' : 'wf';
-                const vaporizeCd = parseFloat(document.getElementById(`react-${reactPrefix}-cd`).value) || 0;
-                if (time >= this.lastReactionTime[reactPrefix] + vaporizeCd) {
-                    // 반응 쿨다운 통과: 정상 반응
+            // 증폭 반응 (기화/융해)
+            if (isAmplify && reactPrefix) {
+                const reactCd = parseFloat(document.getElementById(`react-${reactPrefix}-cd`).value) || 0;
+                if (time >= this.lastReactionTime[reactPrefix] + reactCd) {
                     finalDamage *= mult;
                     isReaction = true;
                     isCritical = true;
-                    reactionMsg = `기화(x${mult})`;
+                    reactionMsg = `${reactName}(x${mult})`;
                     this.reactCount++;
-                    
-                    // 후속 타격(Trigger)의 부착량 * 소모율 만큼 기존 부착량(Host)을 차감
                     this.gauge -= (actualAttach * consumeRate);
-                    
-                    if (this.gauge <= 0) {
-                        this.element = 'None';
-                        this.gauge = 0;
-                    }
+                    if (this.gauge <= 0) { this.element = 'None'; this.gauge = 0; }
                     this.lastReactionTime[reactPrefix] = time;
-                    commitAttachIcd = true; // 반응에 소모되었으므로 부착 쿨다운 갱신
+                    commitAttachIcd = true;
                 } else {
-                    // 반응 쿨다운 차단: 부착 무효 및 ICD 유예 (단순 물리피해처럼 처리됨)
-                    commitAttachIcd = false; 
+                    commitAttachIcd = false;
+                }
+            }
+            // 빙결 반응
+            else if (isFreeze) {
+                const freezeCd = parseFloat(document.getElementById(`react-${reactPrefix}-cd`).value) || 0;
+                if (time >= this.lastReactionTime[reactPrefix] + freezeCd) {
+                    isReaction = true;
+                    isCritical = true;
+                    reactionMsg = '빙결!';
+                    this.reactCount++;
+                    this.gauge -= (actualAttach * consumeRate);
+                    if (this.gauge <= 0) this.gauge = 0;
+                    // Frozen 상태로 전환 (남은 게이지 유지)
+                    this.element = 'Frozen';
+                    if (this.gauge <= 0) this.gauge = actualAttach; // 최소 게이지 보장
+                    this.lastReactionTime[reactPrefix] = time;
+                    commitAttachIcd = true;
+                } else {
+                    commitAttachIcd = false;
                 }
             }
         } else {
-            // 반응 없음, 속성 중첩 또는 신규 부착
+            // 반응 없음: 속성 중첩 또는 신규 부착
             if (actualAttach > 0) {
                 if (this.element === 'None') {
                     const initMult = parseFloat(document.getElementById('initial-attach-mult').value) || 1.0;
@@ -141,6 +193,16 @@ class DummyTarget {
             badge.classList.add('badge-water');
             elemName = '💧 Water';
             fill.style.backgroundColor = 'var(--color-water)';
+        } else if (this.element === 'Ice') {
+            dummy.classList.add('elem-ice');
+            badge.classList.add('badge-ice');
+            elemName = '❄️ Ice';
+            fill.style.backgroundColor = 'var(--color-ice)';
+        } else if (this.element === 'Frozen') {
+            dummy.classList.add('elem-frozen');
+            badge.classList.add('badge-frozen');
+            elemName = '🧊 Frozen';
+            fill.style.backgroundColor = 'var(--color-frozen)';
         } else {
             fill.style.backgroundColor = 'var(--color-none)';
         }
@@ -170,6 +232,7 @@ class DummyTarget {
         if (!isCritical) {
             if (element === 'Fire') div.style.color = '#fca5a5';
             else if (element === 'Water') div.style.color = '#93c5fd';
+            else if (element === 'Ice') div.style.color = '#a5f3fc';
         }
 
         container.appendChild(div);
@@ -228,10 +291,11 @@ class SimulationEngine {
         const charAElem = document.getElementById('char-a-element').value;
         const charBElem = document.getElementById('char-b-element').value;
         
+        const elemIcon = (v) => v === 'Fire' ? '🔥' : v === 'Water' ? '💧' : '❄️';
         const tabBtnA = document.getElementById('tab-btn-a');
         const tabBtnB = document.getElementById('tab-btn-b');
-        if (tabBtnA) tabBtnA.textContent = `Char A (${charAElem === 'Fire' ? '🔥' : '💧'})`;
-        if (tabBtnB) tabBtnB.textContent = `Char B (${charBElem === 'Fire' ? '🔥' : '💧'})`;
+        if (tabBtnA) tabBtnA.textContent = `Char A (${elemIcon(charAElem)})`;
+        if (tabBtnB) tabBtnB.textContent = `Char B (${elemIcon(charBElem)})`;
 
         ['a1', 'a2', 'b1', 'b2'].forEach(id => {
             const desc = document.getElementById(`hud-${id}-desc`);
@@ -350,7 +414,7 @@ class SimulationEngine {
         for (let i = this.hitQueue.length - 1; i >= 0; i--) {
             const hit = this.hitQueue[i];
             if (this.currentTime >= hit.timeTrigger) {
-                const result = this.target.applyHit(hit.label, hit.element, hit.damage, hit.attach, this.currentTime);
+                const result = this.target.applyHit(hit.skillId, hit.element, hit.damage, hit.attach, this.currentTime);
                 
                 let logMsg = `Skill ${hit.label} 적중! 피해: <b>${Math.floor(result.damage)}</b>`;
                 if (result.isReaction) {
@@ -419,6 +483,7 @@ class SimulationEngine {
         for (let i = 0; i < hitCount; i++) {
             this.hitQueue.push({
                 timeTrigger: this.currentTime + (i * hitInterval),
+                skillId: id,
                 label: label,
                 element: element,
                 damage: hitDamage,
@@ -597,7 +662,8 @@ window.addEventListener('keydown', (e) => {
 document.getElementById('char-a-element').addEventListener('change', (e) => {
     const card = document.getElementById('char-a-card-setup');
     card.className = `character-card color-${e.target.value.toLowerCase()}-theme glass-panel`;
-    const t = (e.target.value === 'Fire') ? '🔥 화 (Fire)' : '💧 수 (Water)';
+    const iconMap = { 'Fire': '🔥 화 (Fire)', 'Water': '💧 수 (Water)', 'Ice': '❄️ 빙 (Ice)' };
+    const t = iconMap[e.target.value] || e.target.value;
     document.querySelector('#skill-a1-attr option[value="elemental"]').textContent = `속성 피해 (${t})`;
     document.querySelector('#skill-a2-attr option[value="elemental"]').textContent = `속성 피해 (${t})`;
 });
@@ -605,7 +671,15 @@ document.getElementById('char-a-element').addEventListener('change', (e) => {
 document.getElementById('char-b-element').addEventListener('change', (e) => {
     const card = document.getElementById('char-b-card-setup');
     card.className = `character-card color-${e.target.value.toLowerCase()}-theme glass-panel`;
-    const t = (e.target.value === 'Fire') ? '🔥 화 (Fire)' : '💧 수 (Water)';
+    const iconMap = { 'Fire': '🔥 화 (Fire)', 'Water': '💧 수 (Water)', 'Ice': '❄️ 빙 (Ice)' };
+    const t = iconMap[e.target.value] || e.target.value;
     document.querySelector('#skill-b1-attr option[value="elemental"]').textContent = `속성 피해 (${t})`;
     document.querySelector('#skill-b2-attr option[value="elemental"]').textContent = `속성 피해 (${t})`;
+});
+
+// 반응 드롭다운 전환 이벤트
+document.getElementById('reaction-selector').addEventListener('change', (e) => {
+    document.querySelectorAll('.reaction-config').forEach(el => el.style.display = 'none');
+    const selectedConfig = document.getElementById(`config-${e.target.value}`);
+    if (selectedConfig) selectedConfig.style.display = 'block';
 });
