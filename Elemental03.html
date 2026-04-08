@@ -42,6 +42,9 @@
                             <option value="vaporize" selected>💨 기화 (Vaporize)</option>
                             <option value="melt">🌡️ 융해 (Melt)</option>
                             <option value="freeze">🧊 빙결 (Freeze)</option>
+                            <option value="overheat">🔥⚡ 과열 (Overheat)</option>
+                            <option value="electrify">⚡💧 감전 (Electrify)</option>
+                            <option value="superconduct">⚡❄️ 초전도 (Superconduct)</option>
                         </select>
                     </div>
 
@@ -91,6 +94,42 @@
                         <div class="form-row"><label>쇄빙 물리 피해 배수:</label><input type="number" id="react-shatter-mult" value="1.5" step="0.1"></div>
                         <div class="form-row"><label>쇄빙 반응 쿨다운(초):</label><input type="number" id="react-shatter-cd" value="1.0" min="0" step="0.1"></div>
                     </div>
+
+                    <!-- 과열 (Overheat): Fire ↔ Thunder -->
+                    <div class="reaction-config" id="config-overheat" style="display:none;">
+                        <h3 style="margin-top: 15px; color:var(--color-fire);">🔥 Host → ⚡ Trigger</h3>
+                        <div class="form-row"><label>반응 쿨다운(초):</label><input type="number" id="react-ft-cd" value="0" min="0" step="0.1"></div>
+                        <div class="form-row"><label>화속성 폭발 피해 배수:</label><input type="number" id="react-ft-mult" value="1.5" step="0.1"></div>
+                        <div class="form-row"><label>기존 부착 게이지 소모율:</label><input type="number" id="react-ft-consume" value="1.0" step="0.1"></div>
+                        
+                        <h3 style="margin-top: 15px; color:var(--color-thunder);">⚡ Host → 🔥 Trigger</h3>
+                        <div class="form-row"><label>반응 쿨다운(초):</label><input type="number" id="react-tf-cd" value="0" min="0" step="0.1"></div>
+                        <div class="form-row"><label>화속성 폭발 피해 배수:</label><input type="number" id="react-tf-mult" value="1.5" step="0.1"></div>
+                        <div class="form-row"><label>기존 부착 게이지 소모율:</label><input type="number" id="react-tf-consume" value="1.0" step="0.1"></div>
+                        <p style="font-size:0.75rem; color:var(--text-muted); margin-top:10px;">⚠️ 과열 피해는 항상 화속성이며, 반응 피해는 속성 부착을 발생시키지 않습니다.</p>
+                    </div>
+
+                    <!-- 감전 (Electrify): Water ↔ Thunder -->
+                    <div class="reaction-config" id="config-electrify" style="display:none;">
+                        <h3 style="margin-top: 15px; color:#7c3aed;">💧⚡ 감전 (속성 공존)</h3>
+                        <div class="form-row"><label>틱 간격(초):</label><input type="number" id="react-electrify-tick" value="1.0" min="0.1" step="0.1"></div>
+                        <div class="form-row"><label>틱당 피해량 배수:</label><input type="number" id="react-electrify-mult" value="1.0" step="0.1"></div>
+                        <div class="form-row"><label>틱당 양쪽 게이지 소모량:</label><input type="number" id="react-electrify-consume" value="40" step="5"></div>
+                        <p style="font-size:0.75rem; color:var(--text-muted); margin-top:10px;">⚠️ 수+뇌 속성이 공존하며 틱마다 양쪽 게이지를 동시 소모합니다. 반응 피해는 속성 부착을 발생시키지 않습니다.</p>
+                    </div>
+
+                    <!-- 초전도 (Superconduct): Ice ↔ Thunder -->
+                    <div class="reaction-config" id="config-superconduct" style="display:none;">
+                        <h3 style="margin-top: 15px; color:var(--color-ice);">❄️ Host → ⚡ Trigger</h3>
+                        <div class="form-row"><label>반응 쿨다운(초):</label><input type="number" id="react-it-cd" value="1.0" min="0" step="0.1"></div>
+                        <div class="form-row"><label>피해량 배수:</label><input type="number" id="react-it-mult" value="1.5" step="0.1"></div>
+                        <div class="form-row"><label>기존 부착 게이지 소모율:</label><input type="number" id="react-it-consume" value="1.0" step="0.1"></div>
+                        
+                        <h3 style="margin-top: 15px; color:var(--color-thunder);">⚡ Host → ❄️ Trigger</h3>
+                        <div class="form-row"><label>반응 쿨다운(초):</label><input type="number" id="react-ti-cd" value="1.0" min="0" step="0.1"></div>
+                        <div class="form-row"><label>피해량 배수:</label><input type="number" id="react-ti-mult" value="1.5" step="0.1"></div>
+                        <div class="form-row"><label>기존 부착 게이지 소모율:</label><input type="number" id="react-ti-consume" value="1.0" step="0.1"></div>
+                    </div>
                 </div>
 
                 <!-- 캐릭터 A -->
@@ -101,6 +140,7 @@
                             <option value="Fire" selected>🔥 화 (Fire)</option>
                             <option value="Water">💧 수 (Water)</option>
                             <option value="Ice">❄️ 빙 (Ice)</option>
+                            <option value="Thunder">⚡ 뇌 (Thunder)</option>
                         </select>
                     </div>
                     <!-- 스킬 A1 (궁극기) -->
@@ -141,6 +181,7 @@
                             <option value="Fire">🔥 화 (Fire)</option>
                             <option value="Water" selected>💧 수 (Water)</option>
                             <option value="Ice">❄️ 빙 (Ice)</option>
+                            <option value="Thunder">⚡ 뇌 (Thunder)</option>
                         </select>
                     </div>
                     <!-- 스킬 B1 (궁극기) -->

@@ -9,12 +9,14 @@
     --color-fire: #ef4444;
     --color-water: #3b82f6;
     --color-ice: #67e8f9;
+    --color-thunder: #eab308;
     --color-frozen: #06b6d4;
     --color-none: #334155;
     
     --glow-fire: rgba(239, 68, 68, 0.5);
     --glow-water: rgba(59, 130, 246, 0.5);
     --glow-ice: rgba(103, 232, 249, 0.5);
+    --glow-thunder: rgba(234, 179, 8, 0.5);
     --glow-frozen: rgba(6, 182, 212, 0.6);
     --glow-none: rgba(51, 65, 85, 0.5);
 }
@@ -111,6 +113,7 @@ h3 { font-size: 0.8rem; margin-bottom: 6px; color: var(--text-muted); }
 .color-fire-theme { background: linear-gradient(180deg, rgba(239, 68, 68, 0.1) 0%, transparent 100%); border-top: 2px solid var(--color-fire); }
 .color-water-theme { background: linear-gradient(180deg, rgba(59, 130, 246, 0.1) 0%, transparent 100%); border-top: 2px solid var(--color-water); }
 .color-ice-theme { background: linear-gradient(180deg, rgba(103, 232, 249, 0.1) 0%, transparent 100%); border-top: 2px solid var(--color-ice); }
+.color-thunder-theme { background: linear-gradient(180deg, rgba(234, 179, 8, 0.1) 0%, transparent 100%); border-top: 2px solid var(--color-thunder); }
 
 /* HUD Tabs */
 .hud-tabs-container { width: 100%; max-width: 420px; margin: 0 auto; background: rgba(0,0,0,0.5); border-radius: 10px; border: 1px solid var(--panel-border); overflow: hidden; }
@@ -151,11 +154,16 @@ h3 { font-size: 0.8rem; margin-bottom: 6px; color: var(--text-muted); }
 .elem-water { background-color: var(--color-water) !important; box-shadow: inset 0 0 30px rgba(0,0,0,0.8), 0 0 60px var(--glow-water) !important; }
 .elem-ice { background-color: var(--color-ice) !important; box-shadow: inset 0 0 30px rgba(0,0,0,0.8), 0 0 60px var(--glow-ice) !important; }
 .elem-frozen { background-color: var(--color-frozen) !important; box-shadow: inset 0 0 30px rgba(0,0,0,0.8), 0 0 60px var(--glow-frozen) !important; animation: frozenPulse 1.5s infinite; }
+.elem-thunder { background-color: var(--color-thunder) !important; box-shadow: inset 0 0 30px rgba(0,0,0,0.8), 0 0 60px var(--glow-thunder) !important; }
+.elem-electrocharged { background-color: #7c3aed !important; box-shadow: inset 0 0 30px rgba(0,0,0,0.8), 0 0 60px rgba(124, 58, 237, 0.6) !important; animation: electroPulse 0.8s infinite; }
 @keyframes frozenPulse { 0%,100% { box-shadow: inset 0 0 30px rgba(0,0,0,0.8), 0 0 40px var(--glow-frozen); } 50% { box-shadow: inset 0 0 30px rgba(0,0,0,0.8), 0 0 80px var(--glow-frozen); } }
+@keyframes electroPulse { 0%,100% { box-shadow: inset 0 0 30px rgba(0,0,0,0.8), 0 0 40px rgba(124, 58, 237, 0.4); } 50% { box-shadow: inset 0 0 30px rgba(0,0,0,0.8), 0 0 80px rgba(124, 58, 237, 0.8); } }
 .badge-fire { background-color: var(--color-fire) !important; }
 .badge-water { background-color: var(--color-water) !important; }
 .badge-ice { background-color: var(--color-ice) !important; }
+.badge-thunder { background-color: var(--color-thunder) !important; }
 .badge-frozen { background-color: var(--color-frozen) !important; }
+.badge-electrocharged { background: linear-gradient(135deg, var(--color-water), var(--color-thunder)) !important; }
 
 /* Logs & Popups */
 .log-container { flex: 1; background: rgba(0,0,0,0.4); border-radius: 6px; padding: 6px; overflow-y: auto; font-family: monospace; font-size: 0.65rem; display: flex; flex-direction: column; gap: 2px; min-height: 0; }

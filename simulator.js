@@ -3,32 +3,112 @@ const TICK_MS = 50; // 50ms per tick
 
 class DummyTarget {
     constructor() {
-        this.element = 'None';
-        this.gauge = 0;
+        // 다중 Aura 시스템: { Water: 200, Thunder: 150 } 형태로 동시 관리
+        this.auras = {};
+        this.frozenGauge = 0; // 빙결 전용 게이지
+        this.isFrozen = false;
+        this.isElectrocharged = false; // 감전 공존 상태
+        this.lastElectroTick = -999;
         this.totalDamageTaken = 0;
+        this.reactCount = 0;
         this.lastAttachTime = { 'a1': -999, 'a2': -999, 'b1': -999, 'b2': -999 };
-        this.lastReactionTime = { 'fw': -999, 'wf': -999, 'fi': -999, 'if': -999, 'wi': -999, 'iw': -999, 'shatter': -999 };
+        this.lastReactionTime = {
+            'fw': -999, 'wf': -999, 'fi': -999, 'if': -999,
+            'wi': -999, 'iw': -999, 'shatter': -999,
+            'ft': -999, 'tf': -999, 'it': -999, 'ti': -999
+        };
         this.updateVisuals();
     }
 
     reset() {
-        this.element = 'None';
-        this.gauge = 0;
+        this.auras = {};
+        this.frozenGauge = 0;
+        this.isFrozen = false;
+        this.isElectrocharged = false;
+        this.lastElectroTick = -999;
         this.totalDamageTaken = 0;
         this.reactCount = 0;
         this.lastAttachTime = { 'a1': -999, 'a2': -999, 'b1': -999, 'b2': -999 };
-        this.lastReactionTime = { 'fw': -999, 'wf': -999, 'fi': -999, 'if': -999, 'wi': -999, 'iw': -999, 'shatter': -999 };
+        this.lastReactionTime = {
+            'fw': -999, 'wf': -999, 'fi': -999, 'if': -999,
+            'wi': -999, 'iw': -999, 'shatter': -999,
+            'ft': -999, 'tf': -999, 'it': -999, 'ti': -999
+        };
         this.updateVisuals();
     }
 
+    // 현재 주 속성 (UI/판정용)
+    get element() {
+        if (this.isFrozen) return 'Frozen';
+        if (this.isElectrocharged) return 'Electrocharged';
+        const keys = Object.keys(this.auras).filter(k => this.auras[k] > 0);
+        return keys.length > 0 ? keys[0] : 'None';
+    }
+
+    // 주 속성의 게이지
+    get gauge() {
+        if (this.isFrozen) return this.frozenGauge;
+        const keys = Object.keys(this.auras).filter(k => this.auras[k] > 0);
+        return keys.length > 0 ? this.auras[keys[0]] : 0;
+    }
+
     decay(dt, decayRate) {
-        if (this.element !== 'None' && this.gauge > 0) {
-            this.gauge -= decayRate * dt;
-            if (this.gauge <= 0) {
-                this.element = 'None';
-                this.gauge = 0;
+        // 각 aura 독립 감소
+        for (const elem of Object.keys(this.auras)) {
+            if (this.auras[elem] > 0) {
+                this.auras[elem] -= decayRate * dt;
+                if (this.auras[elem] <= 0) {
+                    delete this.auras[elem];
+                }
             }
-            this.updateVisuals();
+        }
+        // Frozen 게이지 감소
+        if (this.isFrozen) {
+            this.frozenGauge -= decayRate * dt;
+            if (this.frozenGauge <= 0) {
+                this.frozenGauge = 0;
+                this.isFrozen = false;
+            }
+        }
+        // 감전 공존 체크: 수 또는 뇌 중 하나라도 없으면 감전 해제
+        if (this.isElectrocharged) {
+            if (!this.auras['Water'] || this.auras['Water'] <= 0 || !this.auras['Thunder'] || this.auras['Thunder'] <= 0) {
+                this.isElectrocharged = false;
+            }
+        }
+        this.updateVisuals();
+    }
+
+    // 감전 틱 데미지 처리 (SimulationEngine.tick에서 호출)
+    processElectrifyTick(time, logFn) {
+        if (!this.isElectrocharged) return;
+        const tickInterval = parseFloat(document.getElementById('react-electrify-tick').value) || 1.0;
+        if (time < this.lastElectroTick + tickInterval) return;
+
+        const mult = parseFloat(document.getElementById('react-electrify-mult').value) || 1.0;
+        const consumePerTick = parseFloat(document.getElementById('react-electrify-consume').value) || 40;
+        const baseDmg = 50; // 감전 틱 기본 피해
+        const tickDmg = baseDmg * mult;
+
+        // 양쪽 게이지 동시 소모
+        this.auras['Water'] = (this.auras['Water'] || 0) - consumePerTick;
+        this.auras['Thunder'] = (this.auras['Thunder'] || 0) - consumePerTick;
+
+        let ended = false;
+        if (this.auras['Water'] <= 0) { delete this.auras['Water']; ended = true; }
+        if (this.auras['Thunder'] <= 0) { delete this.auras['Thunder']; ended = true; }
+
+        if (ended) this.isElectrocharged = false;
+
+        this.totalDamageTaken += tickDmg;
+        this.reactCount++;
+        this.lastElectroTick = time;
+        this.spawnDamageText(tickDmg, true, 'Thunder');
+        this.updateVisuals();
+
+        if (logFn) {
+            const remaining = `W:${Math.floor(this.auras['Water'] || 0)} T:${Math.floor(this.auras['Thunder'] || 0)}`;
+            logFn(time, `⚡ 감전 틱! 피해: <b>${Math.floor(tickDmg)}</b> [${remaining}]${ended ? ' <span style="color:#ef4444">감전 종료</span>' : ''}`, 'reaction');
         }
     }
 
@@ -37,14 +117,14 @@ class DummyTarget {
         const icd = parseFloat(document.getElementById('global-icd').value) || 0;
         
         // === 쇄빙 (Shatter): Frozen 상태 + Physical 타격 ===
-        if (this.element === 'Frozen' && element === 'Physical') {
+        if (this.isFrozen && element === 'Physical') {
             const shatterCd = parseFloat(document.getElementById('react-shatter-cd').value) || 0;
             if (time >= this.lastReactionTime['shatter'] + shatterCd) {
                 const shatterMult = parseFloat(document.getElementById('react-shatter-mult').value) || 1.0;
                 const finalDamage = damage * shatterMult;
-                // 쇄빙: 빙결 해제 및 게이지 전체 초기화
-                this.element = 'None';
-                this.gauge = 0;
+                this.isFrozen = false;
+                this.frozenGauge = 0;
+                this.auras = {}; // 빙결 해제 시 모든 aura 초기화
                 this.lastReactionTime['shatter'] = time;
                 this.reactCount++;
                 this.totalDamageTaken += finalDamage;
@@ -52,14 +132,13 @@ class DummyTarget {
                 this.spawnDamageText(finalDamage, true, 'Physical');
                 return { damage: finalDamage, isReaction: true, reactionMsg: `쇄빙(x${shatterMult})` };
             }
-            // 쇄빙 쿨다운 중: 일반 물리피해
             this.totalDamageTaken += damage;
             this.updateVisuals();
             this.spawnDamageText(damage, false, 'Physical');
             return { damage, isReaction: false, reactionMsg: '' };
         }
 
-        // ICD 판정 통과 여부
+        // ICD 판정
         let passesAttachIcd = false;
         if (element !== 'Physical' && attachAmount > 0) {
             if (time >= this.lastAttachTime[skillLabel] + icd) {
@@ -73,91 +152,152 @@ class DummyTarget {
         let reactionMsg = '';
         let isCritical = false;
         let commitAttachIcd = false;
+        let extraDamageLog = null; // 과열 추가 피해 로그용
 
-        // === 반응 매트릭스: 속성이 다르고 부착량이 있을 때 ===
-        if (actualAttach > 0 && this.element !== 'None' && this.element !== 'Frozen' && this.element !== element) {
-            let mult = 1.0;
-            let consumeRate = 1.0;
-            let reactPrefix = '';
-            let reactName = '';
-            let isAmplify = false;
-            let isFreeze = false;
+        const hostElem = this.element; // 현재 주 속성
+        const hasAura = (e) => this.auras[e] && this.auras[e] > 0;
 
-            // 기화 (Vaporize): Fire ↔ Water
-            if (this.element === 'Fire' && element === 'Water') {
+        // === 반응 판정: 부착량이 있고, 기존 속성과 다를 때 ===
+        if (actualAttach > 0 && hostElem !== 'None' && hostElem !== 'Frozen' && hostElem !== 'Electrocharged' && hostElem !== element) {
+            let mult = 1.0, consumeRate = 1.0, reactPrefix = '', reactName = '';
+            let isAmplify = false, isFreeze = false, isOverheat = false, isElectrify = false, isSuperconduct = false;
+
+            // 기화 (Fire ↔ Water)
+            if (hostElem === 'Fire' && element === 'Water') {
                 mult = parseFloat(document.getElementById('react-fw-mult').value) || 1.0;
                 consumeRate = parseFloat(document.getElementById('react-fw-consume').value) || 1.0;
                 reactPrefix = 'fw'; reactName = '기화'; isAmplify = true;
-            } else if (this.element === 'Water' && element === 'Fire') {
+            } else if (hostElem === 'Water' && element === 'Fire') {
                 mult = parseFloat(document.getElementById('react-wf-mult').value) || 1.0;
                 consumeRate = parseFloat(document.getElementById('react-wf-consume').value) || 1.0;
                 reactPrefix = 'wf'; reactName = '기화'; isAmplify = true;
             }
-            // 융해 (Melt): Fire ↔ Ice
-            else if (this.element === 'Fire' && element === 'Ice') {
+            // 융해 (Fire ↔ Ice)
+            else if (hostElem === 'Fire' && element === 'Ice') {
                 mult = parseFloat(document.getElementById('react-fi-mult').value) || 1.0;
                 consumeRate = parseFloat(document.getElementById('react-fi-consume').value) || 1.0;
                 reactPrefix = 'fi'; reactName = '융해'; isAmplify = true;
-            } else if (this.element === 'Ice' && element === 'Fire') {
+            } else if (hostElem === 'Ice' && element === 'Fire') {
                 mult = parseFloat(document.getElementById('react-if-mult').value) || 1.0;
                 consumeRate = parseFloat(document.getElementById('react-if-consume').value) || 1.0;
                 reactPrefix = 'if'; reactName = '융해'; isAmplify = true;
             }
-            // 빙결 (Freeze): Water ↔ Ice
-            else if ((this.element === 'Water' && element === 'Ice') || (this.element === 'Ice' && element === 'Water')) {
-                reactPrefix = (this.element === 'Water') ? 'wi' : 'iw';
+            // 빙결 (Water ↔ Ice)
+            else if ((hostElem === 'Water' && element === 'Ice') || (hostElem === 'Ice' && element === 'Water')) {
+                reactPrefix = (hostElem === 'Water') ? 'wi' : 'iw';
                 consumeRate = parseFloat(document.getElementById(`react-${reactPrefix}-consume`).value) || 0.5;
                 reactName = '빙결'; isFreeze = true;
             }
+            // 과열 (Fire ↔ Thunder)
+            else if ((hostElem === 'Fire' && element === 'Thunder') || (hostElem === 'Thunder' && element === 'Fire')) {
+                reactPrefix = (hostElem === 'Fire') ? 'ft' : 'tf';
+                mult = parseFloat(document.getElementById(`react-${reactPrefix}-mult`).value) || 1.5;
+                consumeRate = parseFloat(document.getElementById(`react-${reactPrefix}-consume`).value) || 1.0;
+                reactName = '과열'; isOverheat = true;
+            }
+            // 감전 (Water ↔ Thunder)
+            else if ((hostElem === 'Water' && element === 'Thunder') || (hostElem === 'Thunder' && element === 'Water')) {
+                reactName = '감전'; isElectrify = true;
+            }
+            // 초전도 (Ice ↔ Thunder)
+            else if ((hostElem === 'Ice' && element === 'Thunder') || (hostElem === 'Thunder' && element === 'Ice')) {
+                reactPrefix = (hostElem === 'Ice') ? 'it' : 'ti';
+                mult = parseFloat(document.getElementById(`react-${reactPrefix}-mult`).value) || 1.5;
+                consumeRate = parseFloat(document.getElementById(`react-${reactPrefix}-consume`).value) || 1.0;
+                reactName = '초전도'; isSuperconduct = true;
+            }
 
-            // 증폭 반응 (기화/융해)
+            // --- 증폭 반응 (기화/융해) ---
             if (isAmplify && reactPrefix) {
                 const reactCd = parseFloat(document.getElementById(`react-${reactPrefix}-cd`).value) || 0;
                 if (time >= this.lastReactionTime[reactPrefix] + reactCd) {
                     finalDamage *= mult;
-                    isReaction = true;
-                    isCritical = true;
+                    isReaction = true; isCritical = true;
                     reactionMsg = `${reactName}(x${mult})`;
                     this.reactCount++;
-                    this.gauge -= (actualAttach * consumeRate);
-                    if (this.gauge <= 0) { this.element = 'None'; this.gauge = 0; }
+                    this.auras[hostElem] = (this.auras[hostElem] || 0) - (actualAttach * consumeRate);
+                    if (this.auras[hostElem] <= 0) delete this.auras[hostElem];
                     this.lastReactionTime[reactPrefix] = time;
                     commitAttachIcd = true;
-                } else {
-                    commitAttachIcd = false;
                 }
             }
-            // 빙결 반응
+            // --- 빙결 ---
             else if (isFreeze) {
                 const freezeCd = parseFloat(document.getElementById(`react-${reactPrefix}-cd`).value) || 0;
                 if (time >= this.lastReactionTime[reactPrefix] + freezeCd) {
-                    isReaction = true;
-                    isCritical = true;
+                    isReaction = true; isCritical = true;
                     reactionMsg = '빙결!';
                     this.reactCount++;
-                    this.gauge -= (actualAttach * consumeRate);
-                    if (this.gauge <= 0) this.gauge = 0;
-                    // Frozen 상태로 전환 (남은 게이지 유지)
-                    this.element = 'Frozen';
-                    if (this.gauge <= 0) this.gauge = actualAttach; // 최소 게이지 보장
+                    // Frozen 게이지 = 2 * min(수, 빙)
+                    const waterG = (hostElem === 'Water') ? (this.auras['Water'] || 0) : actualAttach;
+                    const iceG = (hostElem === 'Ice') ? (this.auras['Ice'] || 0) : actualAttach;
+                    this.frozenGauge = 2 * Math.min(waterG, iceG);
+                    if (this.frozenGauge <= 0) this.frozenGauge = actualAttach;
+                    this.auras = {}; // 양쪽 속성 소멸
+                    this.isFrozen = true;
                     this.lastReactionTime[reactPrefix] = time;
                     commitAttachIcd = true;
-                } else {
-                    commitAttachIcd = false;
                 }
             }
-        } else {
-            // 반응 없음: 속성 중첩 또는 신규 부착
-            if (actualAttach > 0) {
-                if (this.element === 'None') {
-                    const initMult = parseFloat(document.getElementById('initial-attach-mult').value) || 1.0;
-                    this.element = element;
-                    this.gauge = Math.min(maxGauge, actualAttach * initMult);
-                    commitAttachIcd = true;
-                } else if (this.element === element) {
-                    this.gauge = Math.min(maxGauge, this.gauge + actualAttach);
+            // --- 과열 (항상 화속성 추가 피해, 부착 없음) ---
+            else if (isOverheat) {
+                const reactCd = parseFloat(document.getElementById(`react-${reactPrefix}-cd`).value) || 0;
+                if (time >= this.lastReactionTime[reactPrefix] + reactCd) {
+                    const overheatDmg = damage * mult;
+                    isReaction = true; isCritical = true;
+                    reactionMsg = `과열(x${mult})`;
+                    this.reactCount++;
+                    // 기존 게이지 소모
+                    this.auras[hostElem] = (this.auras[hostElem] || 0) - (actualAttach * consumeRate);
+                    if (this.auras[hostElem] <= 0) delete this.auras[hostElem];
+                    // 과열 추가 피해 (화속성, 부착 없음)
+                    this.totalDamageTaken += overheatDmg;
+                    this.spawnDamageText(overheatDmg, true, 'Fire');
+                    extraDamageLog = { dmg: overheatDmg, elem: 'Fire' };
+                    this.lastReactionTime[reactPrefix] = time;
                     commitAttachIcd = true;
                 }
+            }
+            // --- 감전 (속성 공존 시작) ---
+            else if (isElectrify) {
+                // 트리거 속성을 부착하여 공존 상태로 전환
+                this.auras[element] = Math.min(maxGauge, actualAttach);
+                this.isElectrocharged = true;
+                this.lastElectroTick = time; // 첫 틱은 다음 간격부터
+                isReaction = true; isCritical = true;
+                reactionMsg = '감전 시작!';
+                this.reactCount++;
+                commitAttachIcd = true;
+            }
+            // --- 초전도 ---
+            else if (isSuperconduct) {
+                const reactCd = parseFloat(document.getElementById(`react-${reactPrefix}-cd`).value) || 0;
+                if (time >= this.lastReactionTime[reactPrefix] + reactCd) {
+                    finalDamage *= mult;
+                    isReaction = true; isCritical = true;
+                    reactionMsg = `초전도(x${mult})`;
+                    this.reactCount++;
+                    this.auras[hostElem] = (this.auras[hostElem] || 0) - (actualAttach * consumeRate);
+                    if (this.auras[hostElem] <= 0) delete this.auras[hostElem];
+                    this.lastReactionTime[reactPrefix] = time;
+                    commitAttachIcd = true;
+                }
+            }
+        }
+        // === 감전 공존 중 추가 부착 (같은 속성 보충) ===
+        else if (actualAttach > 0 && this.isElectrocharged && (element === 'Water' || element === 'Thunder')) {
+            this.auras[element] = Math.min(maxGauge, (this.auras[element] || 0) + actualAttach);
+            commitAttachIcd = true;
+        }
+        // === 반응 없음: 신규 부착 또는 동일 속성 중첩 ===
+        else if (actualAttach > 0) {
+            if (Object.keys(this.auras).filter(k => this.auras[k] > 0).length === 0 && !this.isFrozen) {
+                const initMult = parseFloat(document.getElementById('initial-attach-mult').value) || 1.0;
+                this.auras[element] = Math.min(maxGauge, actualAttach * initMult);
+                commitAttachIcd = true;
+            } else if (hasAura(element)) {
+                this.auras[element] = Math.min(maxGauge, this.auras[element] + actualAttach);
+                commitAttachIcd = true;
             }
         }
 
@@ -169,7 +309,7 @@ class DummyTarget {
         this.updateVisuals();
         this.spawnDamageText(finalDamage, isCritical, element);
 
-        return { damage: finalDamage, isReaction, reactionMsg };
+        return { damage: finalDamage, isReaction, reactionMsg, extraDamageLog };
     }
 
     updateVisuals() {
@@ -178,40 +318,46 @@ class DummyTarget {
         const fill = document.getElementById('attachment-gauge-fill');
         const text = document.getElementById('attachment-gauge-text');
 
-        // Reset classes
         dummy.className = 'dummy-target';
         badge.className = 'element-badge';
-        
+
+        const elem = this.element;
+        const maxGauge = parseFloat(document.getElementById('max-gauge').value) || 100;
+        let currentGauge = this.gauge;
         let elemName = '무속성';
-        if (this.element === 'Fire') {
-            dummy.classList.add('elem-fire');
-            badge.classList.add('badge-fire');
-            elemName = '🔥 Fire';
-            fill.style.backgroundColor = 'var(--color-fire)';
-        } else if (this.element === 'Water') {
-            dummy.classList.add('elem-water');
-            badge.classList.add('badge-water');
-            elemName = '💧 Water';
-            fill.style.backgroundColor = 'var(--color-water)';
-        } else if (this.element === 'Ice') {
-            dummy.classList.add('elem-ice');
-            badge.classList.add('badge-ice');
-            elemName = '❄️ Ice';
-            fill.style.backgroundColor = 'var(--color-ice)';
-        } else if (this.element === 'Frozen') {
-            dummy.classList.add('elem-frozen');
-            badge.classList.add('badge-frozen');
-            elemName = '🧊 Frozen';
-            fill.style.backgroundColor = 'var(--color-frozen)';
+
+        const elemMap = {
+            'Fire':    { cls: 'elem-fire',    badge: 'badge-fire',    name: '🔥 Fire',    color: 'var(--color-fire)' },
+            'Water':   { cls: 'elem-water',   badge: 'badge-water',   name: '💧 Water',   color: 'var(--color-water)' },
+            'Ice':     { cls: 'elem-ice',     badge: 'badge-ice',     name: '❄️ Ice',     color: 'var(--color-ice)' },
+            'Thunder': { cls: 'elem-thunder', badge: 'badge-thunder', name: '⚡ Thunder', color: 'var(--color-thunder)' },
+            'Frozen':  { cls: 'elem-frozen',  badge: 'badge-frozen',  name: '🧊 Frozen',  color: 'var(--color-frozen)' },
+            'Electrocharged': { cls: 'elem-electrocharged', badge: 'badge-electrocharged', name: '⚡💧 감전', color: '#7c3aed' },
+        };
+
+        const info = elemMap[elem];
+        if (info) {
+            dummy.classList.add(info.cls);
+            badge.classList.add(info.badge);
+            elemName = info.name;
+            fill.style.backgroundColor = info.color;
         } else {
             fill.style.backgroundColor = 'var(--color-none)';
         }
 
+        // 감전 공존 시 두 게이지의 합을 표시
+        if (this.isElectrocharged) {
+            const wg = Math.floor(this.auras['Water'] || 0);
+            const tg = Math.floor(this.auras['Thunder'] || 0);
+            currentGauge = Math.max(wg, tg);
+            text.textContent = `W:${wg} | T:${tg}`;
+        } else {
+            text.textContent = `${Math.floor(currentGauge)} / ${maxGauge}`;
+        }
+
         badge.textContent = elemName;
-        const maxGauge = parseFloat(document.getElementById('max-gauge').value) || 100;
-        const pct = (this.gauge / maxGauge) * 100;
+        const pct = (currentGauge / maxGauge) * 100;
         fill.style.width = `${Math.min(100, Math.max(0, pct))}%`;
-        text.textContent = `${Math.floor(this.gauge)} / ${maxGauge}`;
 
         document.getElementById('stat-total-dmg').textContent = Math.floor(this.totalDamageTaken).toLocaleString();
         document.getElementById('stat-react-count').textContent = this.reactCount;
@@ -223,16 +369,14 @@ class DummyTarget {
         div.className = `dmg-popup ${isCritical ? 'critical' : ''}`;
         div.textContent = Math.floor(amount);
         
-        // Randomize position slightly around center
         const x = 50 + (Math.random() * 40 - 20);
         const y = 50 + (Math.random() * 40 - 20);
         div.style.left = `${x}%`;
         div.style.top = `${y}%`;
         
         if (!isCritical) {
-            if (element === 'Fire') div.style.color = '#fca5a5';
-            else if (element === 'Water') div.style.color = '#93c5fd';
-            else if (element === 'Ice') div.style.color = '#a5f3fc';
+            const colorMap = { 'Fire': '#fca5a5', 'Water': '#93c5fd', 'Ice': '#a5f3fc', 'Thunder': '#fde68a' };
+            if (colorMap[element]) div.style.color = colorMap[element];
         }
 
         container.appendChild(div);
@@ -291,7 +435,7 @@ class SimulationEngine {
         const charAElem = document.getElementById('char-a-element').value;
         const charBElem = document.getElementById('char-b-element').value;
         
-        const elemIcon = (v) => v === 'Fire' ? '🔥' : v === 'Water' ? '💧' : '❄️';
+        const elemIcon = (v) => ({ 'Fire': '🔥', 'Water': '💧', 'Ice': '❄️', 'Thunder': '⚡' }[v] || v);
         const tabBtnA = document.getElementById('tab-btn-a');
         const tabBtnB = document.getElementById('tab-btn-b');
         if (tabBtnA) tabBtnA.textContent = `Char A (${elemIcon(charAElem)})`;
@@ -390,6 +534,9 @@ class SimulationEngine {
         const decayRate = parseFloat(document.getElementById('decay-rate').value) || 0;
         this.target.decay(dt, decayRate);
 
+        // 감전 틱 데미지 처리
+        this.target.processElectrifyTick(this.currentTime, (t, msg, type) => this.log(t, msg, type));
+
         // 큐에 예약된 다단히트 처리
         for (let i = this.hitQueue.length - 1; i >= 0; i--) {
             const hit = this.hitQueue[i];
@@ -402,6 +549,10 @@ class SimulationEngine {
                     this.log(this.currentTime, logMsg, 'reaction');
                 } else {
                     this.log(this.currentTime, logMsg, 'hit');
+                }
+                // 과열 추가 피해 로그
+                if (result.extraDamageLog) {
+                    this.log(this.currentTime, `🔥 과열 폭발! 화속성 추가 피해: <b>${Math.floor(result.extraDamageLog.dmg)}</b> <span style="color:#94a3b8">(부착 없음)</span>`, 'reaction');
                 }
                 
                 this.hitQueue.splice(i, 1);
@@ -663,7 +814,7 @@ window.addEventListener('keydown', (e) => {
 document.getElementById('char-a-element').addEventListener('change', (e) => {
     const card = document.getElementById('char-a-card-setup');
     card.className = `character-card color-${e.target.value.toLowerCase()}-theme glass-panel`;
-    const iconMap = { 'Fire': '🔥 화 (Fire)', 'Water': '💧 수 (Water)', 'Ice': '❄️ 빙 (Ice)' };
+    const iconMap = { 'Fire': '🔥 화 (Fire)', 'Water': '💧 수 (Water)', 'Ice': '❄️ 빙 (Ice)', 'Thunder': '⚡ 뇌 (Thunder)' };
     const t = iconMap[e.target.value] || e.target.value;
     document.querySelector('#skill-a1-attr option[value="elemental"]').textContent = `속성 피해 (${t})`;
     document.querySelector('#skill-a2-attr option[value="elemental"]').textContent = `속성 피해 (${t})`;
@@ -672,7 +823,7 @@ document.getElementById('char-a-element').addEventListener('change', (e) => {
 document.getElementById('char-b-element').addEventListener('change', (e) => {
     const card = document.getElementById('char-b-card-setup');
     card.className = `character-card color-${e.target.value.toLowerCase()}-theme glass-panel`;
-    const iconMap = { 'Fire': '🔥 화 (Fire)', 'Water': '💧 수 (Water)', 'Ice': '❄️ 빙 (Ice)' };
+    const iconMap = { 'Fire': '🔥 화 (Fire)', 'Water': '💧 수 (Water)', 'Ice': '❄️ 빙 (Ice)', 'Thunder': '⚡ 뇌 (Thunder)' };
     const t = iconMap[e.target.value] || e.target.value;
     document.querySelector('#skill-b1-attr option[value="elemental"]').textContent = `속성 피해 (${t})`;
     document.querySelector('#skill-b2-attr option[value="elemental"]').textContent = `속성 피해 (${t})`;
@@ -718,6 +869,28 @@ function updateReactionSummary() {
 💧 Host → ❄️ Trigger&nbsp;&nbsp;CD: ${wiCd}s<br>
 ❄️ Host → 💧 Trigger&nbsp;&nbsp;CD: ${iwCd}s<br>
 ⚔️ <b style="color:#a78bfa;">쇄빙 (Shatter)</b> — Frozen 상태에서 물리 타격 시 피해 <span style="color:#fbbf24;">x${sMult}</span> 증폭 (CD: ${sCd}s), 빙결 즉시 해제`;
+    } else if (type === 'overheat') {
+        const ftMult = document.getElementById('react-ft-mult').value;
+        const ftCd   = document.getElementById('react-ft-cd').value;
+        const tfMult = document.getElementById('react-tf-mult').value;
+        const tfCd   = document.getElementById('react-tf-cd').value;
+        html = `🔥⚡ <b style="color:white;">과열 (Overheat)</b> — 화·뇌 속성이 겹치면 화속성 폭발 피해를 추가로 입힙니다. <span style="color:#ef4444;">부착 없음</span><br>
+🔥 Host → ⚡ Trigger&nbsp;&nbsp;<span style="color:#fbbf24;">x${ftMult}</span> &nbsp;|&nbsp; CD: ${ftCd}s<br>
+⚡ Host → 🔥 Trigger&nbsp;&nbsp;<span style="color:#fbbf24;">x${tfMult}</span> &nbsp;|&nbsp; CD: ${tfCd}s`;
+    } else if (type === 'electrify') {
+        const tick = document.getElementById('react-electrify-tick').value;
+        const mult = document.getElementById('react-electrify-mult').value;
+        const consume = document.getElementById('react-electrify-consume').value;
+        html = `⚡💧 <b style="color:white;">감전 (Electrify)</b> — 수·뇌 속성이 공존하며 틱마다 양쪽 게이지를 동시 소모합니다. <span style="color:#ef4444;">부착 없음</span><br>
+틱 간격: ${tick}s &nbsp;|&nbsp; 틱 배수: <span style="color:#fbbf24;">x${mult}</span> &nbsp;|&nbsp; 틱당 소모: ${consume}`;
+    } else if (type === 'superconduct') {
+        const itMult = document.getElementById('react-it-mult').value;
+        const itCd   = document.getElementById('react-it-cd').value;
+        const tiMult = document.getElementById('react-ti-mult').value;
+        const tiCd   = document.getElementById('react-ti-cd').value;
+        html = `⚡❄️ <b style="color:white;">초전도 (Superconduct)</b> — 빙·뇌 속성이 겹치면 피해량을 증폭합니다.<br>
+❄️ Host → ⚡ Trigger&nbsp;&nbsp;<span style="color:#fbbf24;">x${itMult}</span> &nbsp;|&nbsp; CD: ${itCd}s<br>
+⚡ Host → ❄️ Trigger&nbsp;&nbsp;<span style="color:#fbbf24;">x${tiMult}</span> &nbsp;|&nbsp; CD: ${tiCd}s`;
     }
     summaryEl.innerHTML = html;
 }
