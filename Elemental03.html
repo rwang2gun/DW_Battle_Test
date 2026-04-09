@@ -12,7 +12,7 @@
         <!-- 상단 헤더 -->
         <header class="glass-panel main-header">
             <div>
-                <h1>🔥💧❄️ Elemental Combat</h1>
+                <h1>🔥💧❄️⚡ Elemental Combat</h1>
                 <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;" id="mode-indicator">현재 모드: Setup Mode</div>
             </div>
             <div class="global-controls">
@@ -83,16 +83,18 @@
                     <div class="reaction-config" id="config-freeze" style="display:none;">
                         <h3 style="margin-top: 15px; color:var(--color-water);">💧 Host → ❄️ Trigger</h3>
                         <div class="form-row"><label>반응 쿨다운(초):</label><input type="number" id="react-wi-cd" value="2.0" min="0" step="0.1"></div>
-                        <div class="form-row"><label>빙결 시 게이지 소모율:</label><input type="number" id="react-wi-consume" value="0.5" step="0.1"></div>
                         
                         <h3 style="margin-top: 15px; color:var(--color-ice);">❄️ Host → 💧 Trigger</h3>
                         <div class="form-row"><label>반응 쿨다운(초):</label><input type="number" id="react-iw-cd" value="2.0" min="0" step="0.1"></div>
-                        <div class="form-row"><label>빙결 시 게이지 소모율:</label><input type="number" id="react-iw-consume" value="0.5" step="0.1"></div>
                         
+                        <h3 style="margin-top: 15px; color:var(--color-frozen);">🧊 빙결 효과 (Frozen)</h3>
+                        <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:8px;">빙결 게이지 = 합산 부착량<br><span style="font-size:0.7rem;">(합산 부착량 = 기존 부착량/2 + 트리거 스킬 부착량)</span></p>
+                        <div id="freeze-duration-preview" style="font-size:0.75rem; color:var(--color-frozen); margin-bottom:4px; padding:6px; background:rgba(0,0,0,0.3); border-radius:4px;">—</div>
+                        <p style="font-size:0.7rem; color:var(--text-muted); margin-top:4px; margin-bottom:10px;">⚠️ 빙결 중: 수/빙 속성 부착 차단 | 화(융해)·뇌(초전도) 반응 가능</p>
+
                         <h3 style="margin-top: 15px; color:#a78bfa;">⚔️ 쇄빙 (Shatter)</h3>
-                        <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">Frozen 상태의 대상에 물리 피해 적중 시 쇄빙 반응이 발생합니다. 빙결 상태가 해제되며 게이지가 초기화됩니다.</p>
-                        <div class="form-row"><label>쇄빙 물리 피해 배수:</label><input type="number" id="react-shatter-mult" value="1.5" step="0.1"></div>
-                        <div class="form-row"><label>쇄빙 반응 쿨다운(초):</label><input type="number" id="react-shatter-cd" value="1.0" min="0" step="0.1"></div>
+                        <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">풀바디리액션 발생 시 쇄빙이 트리거되어 스킬 피해에 비례하는 추가 물리 피해를 입히고 빙결이 즉시 해제됩니다.</p>
+                        <div class="form-row"><label>쇄빙 피해 배수:</label><input type="number" id="react-shatter-mult" value="1.0" step="0.1"></div>
                     </div>
 
                     <!-- 과열 (Overheat): Fire ↔ Thunder -->
@@ -152,6 +154,7 @@
                         <div class="form-row"><label>타격 간격(초):</label><input type="number" id="skill-a1-interval" value="0.5" min="0" step="0.05"></div>
                         <div class="form-row"><label>1회 타격 피해량:</label><input type="number" id="skill-a1-dmg" value="1000" step="10"></div>
                         <div class="form-row"><label>1회 부착량:</label><input type="number" id="skill-a1-attach" value="500" step="5"></div>
+                        <div class="form-row"><label>리액션 타입:</label><select id="skill-a1-reaction"><option value="none">없음</option><option value="normal" selected>일반</option><option value="upper">올려치기</option><option value="push">밀치기</option><option value="knockover">내려치기</option></select></div>
                         <div class="skill-summary">
                             <div>총 피해량: <strong id="summary-a1-dmg">0</strong> | 총 부착량: <strong id="summary-a1-attach">0</strong></div>
                             <div>예상 DPS: <strong id="summary-a1-dps" style="color:#fbbf24;">0</strong>/s</div>
@@ -166,6 +169,7 @@
                         <div class="form-row"><label>타격 간격(초):</label><input type="number" id="skill-a2-interval" value="0.2" min="0" step="0.05"></div>
                         <div class="form-row"><label>1회 타격 피해량:</label><input type="number" id="skill-a2-dmg" value="50" step="10"></div>
                         <div class="form-row"><label>1회 부착량:</label><input type="number" id="skill-a2-attach" value="125" step="5"></div>
+                        <div class="form-row"><label>리액션 타입:</label><select id="skill-a2-reaction"><option value="none">없음</option><option value="normal" selected>일반</option><option value="upper">올려치기</option><option value="push">밀치기</option><option value="knockover">내려치기</option></select></div>
                         <div class="skill-summary">
                             <div>총 피해량: <strong id="summary-a2-dmg">0</strong> | 총 부착량: <strong id="summary-a2-attach">0</strong></div>
                             <div>예상 DPS: <strong id="summary-a2-dps" style="color:#fbbf24;">0</strong>/s</div>
@@ -193,6 +197,7 @@
                         <div class="form-row"><label>타격 간격(초):</label><input type="number" id="skill-b1-interval" value="0.25" min="0" step="0.05"></div>
                         <div class="form-row"><label>1회 타격 피해량:</label><input type="number" id="skill-b1-dmg" value="250" step="10"></div>
                         <div class="form-row"><label>1회 부착량:</label><input type="number" id="skill-b1-attach" value="250" step="5"></div>
+                        <div class="form-row"><label>리액션 타입:</label><select id="skill-b1-reaction"><option value="none">없음</option><option value="normal" selected>일반</option><option value="upper">올려치기</option><option value="push">밀치기</option><option value="knockover">내려치기</option></select></div>
                         <div class="skill-summary">
                             <div>총 피해량: <strong id="summary-b1-dmg">0</strong> | 총 부착량: <strong id="summary-b1-attach">0</strong></div>
                             <div>예상 DPS: <strong id="summary-b1-dps" style="color:#fbbf24;">0</strong>/s</div>
@@ -207,6 +212,7 @@
                         <div class="form-row"><label>타격 간격(초):</label><input type="number" id="skill-b2-interval" value="0.2" min="0" step="0.05"></div>
                         <div class="form-row"><label>1회 타격 피해량:</label><input type="number" id="skill-b2-dmg" value="250" step="10"></div>
                         <div class="form-row"><label>1회 부착량:</label><input type="number" id="skill-b2-attach" value="125" step="5"></div>
+                        <div class="form-row"><label>리액션 타입:</label><select id="skill-b2-reaction"><option value="none">없음</option><option value="normal" selected>일반</option><option value="upper">올려치기</option><option value="push">밀치기</option><option value="knockover">내려치기</option></select></div>
                         <div class="skill-summary">
                             <div>총 피해량: <strong id="summary-b2-dmg">0</strong> | 총 부착량: <strong id="summary-b2-attach">0</strong></div>
                             <div>예상 DPS: <strong id="summary-b2-dps" style="color:#fbbf24;">0</strong>/s</div>
@@ -227,6 +233,14 @@
                     <div style="display:flex; gap:12px; font-size:0.65rem; color:var(--text-muted); margin-bottom:6px; flex-wrap:wrap; justify-content:center;">
                         <span>⌨️ <b style="color:white;">1</b> Char A &nbsp; <b style="color:white;">2</b> Char B</span>
                         <span>🎯 <b style="color:white;">Q</b> 궁극기 &nbsp; <b style="color:white;">E</b> 일반 스킬</span>
+                    </div>
+                    
+                    <!-- 환경 원소 부착 버튼 -->
+                    <div style="display:flex; gap:8px; justify-content:center; margin-bottom: 12px;">
+                        <button class="btn btn-hud" style="padding: 4px 10px; font-size: 0.75rem; flex:unset; color:white;" id="btn-env-fire">🔥 Fire 100</button>
+                        <button class="btn btn-hud" style="padding: 4px 10px; font-size: 0.75rem; flex:unset; color:white;" id="btn-env-water">💧 Water 100</button>
+                        <button class="btn btn-hud" style="padding: 4px 10px; font-size: 0.75rem; flex:unset; color:white;" id="btn-env-ice">❄️ Ice 100</button>
+                        <button class="btn btn-hud" style="padding: 4px 10px; font-size: 0.75rem; flex:unset; color:white;" id="btn-env-thunder">⚡ Thunder 100</button>
                     </div>
                     <!-- Target Area -->
                     <div class="target-container" style="flex: 1; min-height: 160px;">
