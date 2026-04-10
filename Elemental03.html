@@ -24,6 +24,7 @@
                     <button id="btn-save" class="btn btn-secondary" title="현재 브라우저 캐시에 설정 임시 저장">💾 캐시 저장</button>
                     <button id="btn-load" class="btn btn-secondary" title="브라우저 캐시에서 설정 불러오기">📂 캐시 로드</button>
                     <button id="btn-defaults" class="btn btn-secondary" title="모든 설정을 초기값으로 복원">🔄 초기값</button>
+                    <button id="btn-guide" class="btn btn-secondary" style="border-color: #8b5cf6; color: #a78bfa;" title="사용 가이드 도움말 열기">❓ 가이드</button>
                     <button id="btn-toggle-mode" class="btn btn-secondary">시뮬레이션 화면으로 ➔</button>
                 </div>
             </div>
@@ -305,6 +306,60 @@
             </div>
         </section>
 
+    </div>
+
+    <!-- 가이드 모달 (Guide Modal) -->
+    <div id="guide-modal" class="modal-overlay">
+        <div class="modal-window glass-panel">
+            <div class="modal-header">
+                <h2>📖 시뮬레이터 사용 가이드</h2>
+                <button id="btn-close-guide" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="guide-content">
+                    <section>
+                        <h3>🛡️ 1. 모드 안내</h3>
+                        <p>시뮬레이터는 <b>Setup Mode</b>(데이터 편집)와 <b>Combat Mode</b>(실시간 시뮬레이션)로 나뉩니다. 상단 우측 버튼으로 전환하세요.</p>
+                    </section>
+                    
+                    <section>
+                        <h3>⚙️ 2. 데이터 설정 (Setup)</h3>
+                        <ul>
+                            <li><b>전역 설정</b>: 상단 바에서 자연 감소량, 최대 게이지, 부착 ICD 등을 조절합니다.</li>
+                            <li><b>캐릭터 스킬</b>: 각 스킬의 피해량, 타수, 부착량, 리액션 타입(쇄빙 조건)을 설정합니다.</li>
+                            <li><b>반응 매트릭스</b>: 각 속성 조합 시의 증폭 배수와 게이지 소모율을 정의합니다.</li>
+                        </ul>
+                    </section>
+
+                    <section>
+                        <h3>⚔️ 3. 전투 조작 (Combat)</h3>
+                        <div class="key-grid">
+                            <div class="key-item"><kbd>1</kbd> <kbd>2</kbd><span>캐릭터 교체</span></div>
+                            <div class="key-item"><kbd>Q</kbd><span>궁극기 (1번 스킬)</span></div>
+                            <div class="key-item"><kbd>E</kbd><span>일반 스킬 (2번 스킬)</span></div>
+                        </div>
+                        <p style="margin-top:8px;">타겟 위의 <b>속성 버튼(🔥💧❄️⚡)</b>을 눌러 즉시 원소를 주입해 볼 수 있습니다.</p>
+                    </section>
+
+                    <section>
+                        <h3>🧊 4. 주요 반응 메커니즘</h3>
+                        <ul>
+                            <li><b>쇄빙(Shatter)</b>: 빙결 상태인 적을 <code>올려치기/밀치기/내려치기</code> 타입 스킬로 공격 시 발생. 큰 물리 추가 피해를 입히고 빙결을 해제합니다.</li>
+                            <li><b>감전(Electrify)</b>: 수/뇌 속성이 공존하며 틱마다 피해를 입히고 양쪽 게이지를 동시 소모합니다.</li>
+                            <li><b>증폭(기화/융해)</b>: 기존 게이지를 일정 비율 소모하며 데미지를 설정된 배수만큼 증폭시킵니다.</li>
+                        </ul>
+                    </section>
+
+                    <section>
+                        <h3>💾 5. 데이터 관리</h3>
+                        <p><b>[캐시 저장]</b>을 누르면 현재 설정이 브라우저에 저장되어, 새로고침 후에도 <b>[캐시 로드]</b>로 불러올 수 있습니다.</p>
+                    </section>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-close-guide-bottom" class="btn btn-primary" style="width:100%;">확인했습니다</button>
+            </div>
+        </div>
     </div>
 
     <!-- Toast Notification -->
